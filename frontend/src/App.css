@@ -1,0 +1,145 @@
+/* frontend/src/App.css */
+.App {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* 화면 전체 높이를 기준으로 설정 */
+  overflow: hidden; /* 스크롤바가 생기지 않도록 함 */
+}
+
+.App-header {
+  padding: 10px; /* 헤더 높이를 더 줄임 */
+  background-color: #f0f0f0;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+  /* flex-shrink: 0; 헤더가 줄어들지 않도록 설정 */
+}
+
+.App-header h1 {
+  font-size: 1.2em; /* 헤더 글씨 크기를 더 줄임 */
+  margin: 0;
+}
+
+.map-container {
+  position: relative;
+  flex-grow: 1; /* ★★★ 가장 중요: 남은 공간을 모두 차지하도록 설정 */
+  width: 100%;
+  /* height: 400px; <- 고정 높이를 제거합니다. 이 부분이 문제의 원인! */
+}
+
+.App-footer {
+  padding: 15px;
+  background-color: #f8f8f8;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+  /* flex-shrink: 0; 푸터가 줄어들지 않도록 설정 */
+}
+
+/* Layout */
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px 64px;
+}
+
+.header {
+  padding: 8px 2px 16px;
+}
+
+.header h1 {
+  font-size: 24px;
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 960px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Card */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: transform .06s ease, box-shadow .12s ease, border-color .12s ease;
+  text-align: left;
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 25px rgba(0,0,0,.06);
+  border-color: #c7cdd6;
+}
+
+.card-icon {
+  font-size: 28px;
+}
+
+.card-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.card-desc {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* Back button / placeholder */
+.back-btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+}
+
+.placeholder {
+  padding: 24px;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  color: #6b7280;
+}
+
+/* 지도 컨테이너는 오버레이 기준점이 되도록 */
+.map-container { position: relative; }
+
+/* 카카오 드로잉 툴박스가 가려질 때 강제 표시(클래스명이 환경에 따라 다를 수 있어 범용 선택자 사용) */
+.map-container [class*="drawing"], 
+.map-container [class*="Drawing"], 
+.map-container [class*="toolbox"], 
+.map-container [class*="Toolbox"] {
+  z-index: 9999 !important;
+}
+
+.map-container {
+  position: relative;
+}
