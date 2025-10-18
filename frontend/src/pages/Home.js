@@ -1,4 +1,4 @@
-import React from "react"
+﻿import React from "react"
 import { useNavigate } from "react-router-dom"
 import CATEGORIES from "../data/categories"
 
@@ -7,9 +7,15 @@ export default function Home() {
   return (
     <div className="container">
       <header className="header">
-        <h1>스포츠 주차 정보</h1>
-        <p className="subtitle">종목을 선택해 경기장별 주차 팁을 확인하세요</p>
+        <h1>주차 정보 서비스</h1>
+        <p className="subtitle">관심 있는 종목과 구단을 선택해 주차 정보를 확인해 보세요.</p>
       </header>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+        <button onClick={() => navigate("/login")}>로그인</button>
+        <button onClick={() => navigate("/register")}>회원가입</button>
+      </div>
+
       <main className="grid">
         {CATEGORIES.map((c) => (
           <button

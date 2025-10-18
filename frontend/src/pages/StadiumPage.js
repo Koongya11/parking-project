@@ -1,91 +1,179 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { Map, MapMarker } from "react-kakao-maps-sdk"
 import api from "../api"
 
+const PAGE_SIZE = 5
+
+const calcScore = (area) => {
+  const upvote = area.upvoteCount || 0
+  return upvote
+}
+
 export default function StadiumPage() {
-    const { id } = useParams()
-    const nav = useNavigate()
-    const loc = useLocation()
+  const { id } = useParams()
+  const nav = useNavigate()
+  const loc = useLocation()
 
-    // 카테고리 페이지에서 넘겨준 데이터 우선 사용, 없으면 조회
-    const [stadium, setStadium] = useState(loc.state?.stadium || null)
-    const [note, setNote] = useState(localStorage.getItem(`note:${id}`) || "")
+  const [stadium, setStadium] = useState(loc.state?.stadium || null)
+  const [areas, setAreas] = useState([])
+  const [page, setPage] = useState(1)
+  const [loadingAreas, setLoadingAreas] = useState(false)
 
-    useEffect(() => {
-        if (stadium) return
-        // fallback: 목록에서 찾아오기
-        api.get("/stadiums").then(res => {
-            const found = res.data.find((x) => x._id === id)
-            if (found) setStadium(found)
-        })
-    }, [id, stadium])
+  useEffect(() => {
+    if (stadium) return
+    api.get("/stadiums").then(res => {
+      const found = res.data.find((x) => x._id === id)
+      if (found) setStadium(found)
+    })
+  }, [id, stadium])
 
-    const [lng, lat] = stadium.location?.coordinates || [126.9786567, 37.566826]
-    const center = { lat, lng }
+  useEffect(() => {
+    if (!stadium) return
+    setLoadingAreas(true)
+    api.get("/parking-areas")
+      .then(res => {
+        const filtered = (res.data || []).filter(a => a.stadiumName === stadium.stadiumName)
+        setAreas(filtered)
+        setPage(1)
+      })
+      .finally(() => setLoadingAreas(false))
+  }, [stadium])
 
-    // 미니 지도 클릭: 보기 모드(전체 화면) 오픈
-    const openMapView = () => {
-        nav(
-            `/map?stadium=${encodeURIComponent(stadium.stadiumName)}&lat=${lat}&lng=${lng}&category=${stadium.category}`
-        )
+  const [sortMode, setSortMode] = useState("score")
+
+  const sortedAreas = useMemo(() => {
+    const list = [...areas]
+    if (sortMode === "upvote") {
+      return list.sort((a, b) => (b.upvoteCount || 0) - (a.upvoteCount || 0))
     }
-    // 버튼: 영역 추가 모드 오픈
-    const openMapForArea = () => {
-        nav(
-            `/map?stadium=${encodeURIComponent(stadium.stadiumName)}&lat=${lat}&lng=${lng}&draw=1&category=${stadium.category}`
-        )
-    }
-    // 길 안내
-    const startNavigation = () => {
-        const url = `https://map.kakao.com/link/to/${encodeURIComponent(stadium.stadiumName)},${lat},${lng}`
-        localStorage.setItem("lastDestination", JSON.stringify({
-            areaId: `stadium:${stadium._id}`,     // 경기장 단위 목적지 표식
-            title: stadium.stadiumName,
-            timestamp: Date.now(),
-        }))
-        window.open(url, "_blank")
-    }
+    return list.sort((a, b) => {
+      const scoreA = calcScore(a)
+      const scoreB = calcScore(b)
+      if (scoreA !== scoreB) return scoreB - scoreA
+      return (a.createdAt || '').localeCompare(b.createdAt || '')
+    })
+  }, [areas, sortMode])
 
-    const saveNote = () => {
-        localStorage.setItem(`note:${id}`, note)
-        alert("메모가 저장되었습니다.")
-    }
+  if (!stadium) return null
 
-    return (
-        <div className="container">
-            <header className="header">
-                <h1>{stadium.stadiumName}</h1>
-                <p className="subtitle">{stadium.teamName} · {stadium.city || "도시 미지정"}</p>
-            </header>
+  const [lng, lat] = stadium.location?.coordinates || [126.9786567, 37.566826]
+  const center = { lat, lng }
 
-            {/* 미니 지도 (클릭 시 /map 이동) */}
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer" }} onClick={openMapView}>
-                <Map center={center} style={{ width: "100%", height: 320 }} level={3}>
-                    <MapMarker position={center} />
-                </Map>
-            </div>
+  const openMapView = () => {
+    nav(`/map?stadium=${encodeURIComponent(stadium.stadiumName)}&lat=${lat}&lng=${lng}&category=${stadium.category}`)
+  }
 
-            {/* 의유/메모 입력 */}
-            <div style={{ marginTop: 16 }}>
-                <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>의유(메모)</label>
-                <input
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                    placeholder="예) 3루 쪽 외부 공영주차장 추천"
-                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 10 }}
-                />
-                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                    <button onClick={saveNote}>메모 저장</button>
-                </div>
-            </div>
+  const openMapForArea = () => {
+    nav(`/map?stadium=${encodeURIComponent(stadium.stadiumName)}&lat=${lat}&lng=${lng}&draw=1&category=${stadium.category}`)
+  }
 
-            {/* 하단 버튼 두 개 */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 16 }}>
-                <button onClick={openMapForArea} style={{ padding: "12px 10px" }}>
-                    지도 열기 · 영역 추가
+  const totalPages = Math.ceil(sortedAreas.length / PAGE_SIZE) || 1
+  const startIndex = (page - 1) * PAGE_SIZE
+  const pagedAreas = sortedAreas.slice(startIndex, startIndex + PAGE_SIZE)
+
+  const changePage = (next) => {
+    if (next < 1 || next > totalPages) return
+    setPage(next)
+  }
+
+  return (
+    <div className="container">
+      <header className="header">
+        <h1>{stadium.stadiumName}</h1>
+        <p className="subtitle">{stadium.teamName} · {stadium.city || "도시 미정"}</p>
+      </header>
+
+      <div
+        style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer" }}
+        onClick={openMapView}
+      >
+        <Map center={center} style={{ width: "100%", height: 320 }} level={3}>
+          <MapMarker position={center} />
+        </Map>
+      </div>
+
+      <section style={{ marginTop: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>등록된 주차 영역</h2>
+          {sortedAreas.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ color: "#64748b", fontSize: 14 }}>총 {sortedAreas.length}개</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button
+                  onClick={() => setSortMode("score")}
+                  style={{
+                    fontWeight: sortMode === "score" ? 700 : 400,
+                    textDecoration: sortMode === "score" ? "underline" : "none",
+                  }}
+                >
+                  여유 순
                 </button>
+                <button
+                  onClick={() => setSortMode("upvote")}
+                  style={{
+                    fontWeight: sortMode === "upvote" ? 700 : 400,
+                    textDecoration: sortMode === "upvote" ? "underline" : "none",
+                  }}
+                >
+                  추천 순
+                </button>
+              </div>
             </div>
+          )}
         </div>
-    )
+
+        {loadingAreas && <div style={{ color: "#64748b" }}>영역 정보를 불러오는 중...</div>}
+
+        {!loadingAreas && sortedAreas.length === 0 && (
+          <div style={{ padding: 20, border: "1px dashed #e2e8f0", borderRadius: 12, color: "#94a3b8" }}>
+            아직 등록된 주차 영역이 없습니다. 아래의 버튼을 눌러 직접 추가해 주세요.
+          </div>
+        )}
+
+        {!loadingAreas && sortedAreas.length > 0 && (
+          <div style={{ display: "grid", gap: 12 }}>
+            {pagedAreas.map(area => {
+              const upvote = area.upvoteCount || 0
+              return (
+                <div key={area._id} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h3 style={{ margin: 0 }}>{area.title}</h3>
+                    <div style={{ color: "#94a3b8", fontSize: 13 }}>등록일 {area.createdAt ? new Date(area.createdAt).toLocaleDateString() : "-"}</div>
+                  </div>
+                  <div style={{ color: "#475569", marginTop: 8 }}>추천 {upvote}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {!loadingAreas && sortedAreas.length > PAGE_SIZE && (
+          <div style={{ display: "flex", gap: 6, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={() => changePage(page - 1)} disabled={page === 1}>이전</button>
+            {Array.from({ length: totalPages }).map((_, idx) => {
+              const pageNumber = idx + 1
+              const active = pageNumber === page
+              return (
+                <button
+                  key={pageNumber}
+                  onClick={() => changePage(pageNumber)}
+                  style={{ fontWeight: active ? 700 : 400, textDecoration: active ? "underline" : "none" }}
+                >
+                  {pageNumber}
+                </button>
+              )
+            })}
+            <button onClick={() => changePage(page + 1)} disabled={page === totalPages}>다음</button>
+          </div>
+        )}
+      </section>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 24 }}>
+        <button onClick={openMapForArea} style={{ padding: "12px 10px" }}>
+          지도 열기 · 영역 추가
+        </button>
+      </div>
+    </div>
+  )
 }

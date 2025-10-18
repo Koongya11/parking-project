@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+﻿import React, { useEffect, useRef, useState } from "react"
 import axios from "axios"
 import {
     Map,
@@ -6,13 +6,12 @@ import {
     DrawingManager,
     Toolbox,
     MapMarker,
-    MapInfoWindow,
 } from "react-kakao-maps-sdk"
-import "../App.css" // ✅ 경로 수정
+import "../App.css"
 import { useSearchParams } from "react-router-dom"
 
 
-export default function MapPage() {  // ✅ 이름/내보내기 일치
+export default function MapPage() {
     const [parkingAreas, setParkingAreas] = useState([])
     const [mapCenter, setMapCenter] = useState({ lat: 37.566826, lng: 126.9786567 })
     const [isFullScreen, setIsFullScreen] = useState(false)
@@ -22,8 +21,9 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
 
     const [search] = useSearchParams()
     const [dm, setDm] = useState(null)
+    const savingRef = useRef(false)
 
-    const stadiumName = search.get("stadium") // ✅ URL 쿼리에서 stadium 이름 받기
+    const stadiumName = search.get("stadium")
 
     const isDrawMode = search.get("draw") === "1"
 
@@ -35,18 +35,28 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
         }
     }, [search])
 
-    // ✅ 경기장에서 들어오면 항상 전체 화면
+    // Automatically switch to fullscreen when navigating from stadium page
     useEffect(() => {
         if (stadiumName) setIsFullScreen(true)
     }, [stadiumName])
 
-    // ✅ draw=1이면 폴리곤 도구 자동 선택
+    // When draw=1, enable polygon drawing mode
     useEffect(() => {
         if (isDrawMode && dm && window.kakao?.maps?.drawing) {
             setIsFullScreen(true)
             dm.select(window.kakao.maps.drawing.OverlayType.POLYGON)
         }
     }, [isDrawMode, dm])
+
+    useEffect(() => {
+        if (isDrawMode) {
+            const token = localStorage.getItem("USER_TOKEN")
+            if (!token) {
+                alert("주차 구역을 추가하려면 로그인하세요.")
+                window.location.href = "/login"
+            }
+        }
+    }, [isDrawMode])
 
     useEffect(() => {
         fetchParkingAreas()
@@ -57,7 +67,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
                     setMyLocation(newPos)
                     setMapCenter(newPos)
                 },
-                (err) => { console.error("Geolocation 에러:", err) }
+                (err) => { console.error("Geolocation error:", err) }
             )
         }
     }, [])
@@ -68,12 +78,12 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
             .then((response) => {
                 let data = response.data
                 if (stadiumName) {
-                    data = data.filter(a => a.stadiumName === stadiumName) // ✅ 해당 경기장만 표시
+                    data = data.filter(a => a.stadiumName === stadiumName)
                 }
                 setParkingAreas(data)
             })
             .catch((err) => {
-                console.error("주차 구역 정보를 불러오는 데 실패했습니다:", err)
+                console.error("Failed to fetch parking areas:", err)
             })
     }
 
@@ -114,45 +124,58 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
             setSelectedAreaId(null)
             setParkingAreas(prev => prev.map(a => a._id === data._id ? data : a))
         } catch (e) {
-            console.error("피드백 실패:", e)
+            console.error("feedback error:", e)
             alert("피드백 전송에 실패했습니다.")
         }
     }
 
     const handleDrawEnd = (manager) => {
+        if (savingRef.current) return
         const data = manager.getData()
-        const polygonObject = data.polygon[0]
+        const polygons = data.polygon || []
+        const polygonObject = polygons[polygons.length - 1]
         if (!polygonObject) return
         const polygonPath = polygonObject.points
 
         if (Array.isArray(polygonPath)) {
-            const newPolygonCoordinates = polygonPath.map(point => [point.x, point.y]) // [lng, lat]
+            const newPolygonCoordinates = polygonPath.map(point => [point.x, point.y])
             const title = window.prompt("새로운 주차 구역의 제목을 입력하세요:")
-            if (!title) return
+            if (!title) {
+                manager.clear()
+                manager.cancel?.()
+                return
+            }
+
+            savingRef.current = true
 
             const newArea = {
                 _id: Date.now().toString(),
                 category: search.get("category") || "UNKNOWN",
-                stadiumName: stadiumName || "알수없음",
+                stadiumName: stadiumName || "미지정",
                 title,
                 polygon: { type: "Polygon", coordinates: [newPolygonCoordinates] },
             }
 
             setParkingAreas(prev => [...prev, newArea])
 
-            axios.post("http://localhost:5000/api/parking-areas", newArea)
+            const headers = { 'x-user-token': localStorage.getItem('USER_TOKEN') || '' }
+            axios.post("http://localhost:5000/api/parking-areas", newArea, { headers })
                 .then((response) => {
                     alert("새로운 주차 구역이 성공적으로 추가되었습니다.")
                     setParkingAreas(prev => prev.map(a => (a._id === newArea._id ? response.data : a)))
                 })
                 .catch((err) => {
-                    console.error("주차 구역 추가에 실패했습니다:", err)
-                    alert("서버 저장 중 오류가 발생했습니다. 콘솔을 확인하세요.")
+                    console.error("Failed to create parking area:", err)
+                    alert("서버 요청 중 오류가 발생했습니다. 콘솔을 확인하세요.")
+                    setParkingAreas(prev => prev.filter(a => a._id !== newArea._id))
                 })
-                .finally(() => manager.clear())
+                .finally(() => {
+                    manager.clear()
+                    manager.cancel?.()
+                    savingRef.current = false
+                })
         }
     }
-
     const toggleFullScreen = () => setIsFullScreen(!isFullScreen)
 
     const selectedPos = selectedArea ? getAreaCentroid(selectedArea) : null
@@ -161,7 +184,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
         <div className={`App ${isFullScreen ? "fullscreen-map" : ""}`}>
             {!isFullScreen && (
                 <header className="App-header">
-                    <h1>잠실 야구장</h1>
+                    <h1>주차 구역 지도</h1>
                 </header>
             )}
 
@@ -185,7 +208,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
                                 fillColor={color}
                                 fillOpacity={0.45}
                                 onClick={() => {
-                                    if (window.confirm(`"${area.title}"로 길 안내를 시작할까요?`)) {
+                                    if (window.confirm(`"${area.title}"(으)로 안내를 시작할까요?`)) {
                                         startNavigation(area)
                                     }
                                 }}
@@ -201,7 +224,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
                             drawingMode={["polygon"]}
                             onCreate={(manager) => {
                                 setDm(manager)
-                                // console.log('DM ready', manager)  // 필요시 확인
+                                // console.log('DM ready', manager)
                             }}
                         >
                             <Toolbox />
@@ -210,7 +233,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
                 </Map>
 
                 <button className="toggle-fullscreen-btn" onClick={toggleFullScreen}>
-                    {isFullScreen ? "지도 축소 및 그리기 종료" : "지도 확대 및 주차 구역 그리기"}
+                    {isFullScreen ? "지도 축소 · 그리기 종료" : "지도 확대 · 주차 구역 그리기"}
                 </button>
             </div>
             {isFullScreen && isDrawMode && dm && (
@@ -219,7 +242,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
                         position: "fixed",
                         top: 16,
                         right: 16,
-                        zIndex: 2147483647,       // 최상위로 띄움
+                        zIndex: 2147483647,
                         background: "rgba(255,255,255,.95)",
                         border: "1px solid #e5e7eb",
                         borderRadius: 10,
@@ -242,3 +265,7 @@ export default function MapPage() {  // ✅ 이름/내보내기 일치
         </div >
     )
 }
+
+
+
+

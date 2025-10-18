@@ -9,7 +9,7 @@ export default function AdminLogin() {
     e.preventDefault()
     if (!token) return alert("토큰을 입력하세요")
     localStorage.setItem("ADMIN_TOKEN", token)
-    navigate("/admin/stadiums")
+    navigate("/admin")
   }
 
   return (

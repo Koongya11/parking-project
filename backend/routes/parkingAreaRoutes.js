@@ -1,14 +1,22 @@
 // backend/routes/parkingAreaRoutes.js
 const express = require('express');
 const router = express.Router();
-const { 
+const {
     getParkingAreas,
     createParkingArea,
-    addFeedback, 
+    addFeedback,
+    updateParkingArea,
+    deleteParkingArea,
 } = require('../controllers/parkingAreaController');
+const adminAuth = require('../middleware/adminAuth');
+const userAuth = require('../middleware/userAuth');
 
-router.route('/').get(getParkingAreas).post(createParkingArea);
+router.route('/').get(getParkingAreas).post(userAuth, createParkingArea);
 
 router.route('/:id/feedback').post(addFeedback);
+
+router.route('/:id')
+    .put(adminAuth, updateParkingArea)
+    .delete(adminAuth, deleteParkingArea);
 
 module.exports = router;
