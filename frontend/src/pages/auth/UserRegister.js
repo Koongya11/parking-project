@@ -1,12 +1,14 @@
 ﻿import React, { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import api from "../../api"
+import { useAuth } from "../../context/AuthContext"
 
 export default function UserRegister() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -14,7 +16,7 @@ export default function UserRegister() {
     setLoading(true)
     try {
       const { data } = await api.post("/auth/register", { email, password })
-      localStorage.setItem("USER_TOKEN", data.token)
+      login(data.token)
       alert("가입이 완료되었습니다.")
       navigate("/")
     } catch (err) {

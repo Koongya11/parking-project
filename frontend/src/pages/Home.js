@@ -11,11 +11,6 @@ export default function Home() {
         <p className="subtitle">관심 있는 종목과 구단을 선택해 주차 정보를 확인해 보세요.</p>
       </header>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
-        <button onClick={() => navigate("/login")}>로그인</button>
-        <button onClick={() => navigate("/register")}>회원가입</button>
-      </div>
-
       <main className="grid">
         {CATEGORIES.map((c) => (
           <button

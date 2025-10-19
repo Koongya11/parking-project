@@ -5,6 +5,7 @@ const {
     getParkingAreas,
     createParkingArea,
     addFeedback,
+    toggleSave,
     updateParkingArea,
     deleteParkingArea,
 } = require('../controllers/parkingAreaController');
@@ -14,6 +15,7 @@ const userAuth = require('../middleware/userAuth');
 router.route('/').get(getParkingAreas).post(userAuth, createParkingArea);
 
 router.route('/:id/feedback').post(addFeedback);
+router.route('/:id/save').post(userAuth, toggleSave);
 
 router.route('/:id')
     .put(adminAuth, updateParkingArea)
