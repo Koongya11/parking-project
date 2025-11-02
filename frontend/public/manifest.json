@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Parking",
+  "name": "Parking Project",
   "icons": [
     {
       "src": "favicon.ico",
@@ -14,12 +14,16 @@
     },
     {
       "src": "logo512.png",
+      "sizes": "512x512",
       "type": "image/png",
-      "sizes": "512x512"
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait",
+  "theme_color": "#0c4a6e",
+  "background_color": "#f8fafc",
+  "description": "Find and share stadium parking availability with the Parking Project web app"
 }
