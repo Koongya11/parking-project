@@ -1,5 +1,9 @@
-﻿import axios from "axios"
-const api = axios.create({ baseURL: "http://localhost:5000/api" })
+import axios from "axios"
+
+const baseURL =
+  (process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api").trim()
+
+const api = axios.create({ baseURL })
 
 api.interceptors.request.use((config) => {
   const adminToken = localStorage.getItem("ADMIN_TOKEN")
