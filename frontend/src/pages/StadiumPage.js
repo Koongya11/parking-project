@@ -178,24 +178,48 @@ export default function StadiumPage() {
   const [lng, lat] = stadium.location?.coordinates || [126.9786567, 37.566826]
   const center = { lat, lng }
 
+  const buildMapUrl = (params = {}) => {
+    const baseParams = new URLSearchParams()
+    if (stadium.stadiumName) baseParams.set("stadium", stadium.stadiumName)
+    if (stadium._id) baseParams.set("stadiumId", stadium._id)
+    if (stadium.category) baseParams.set("category", stadium.category)
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        baseParams.set(key, String(value))
+      }
+    })
+    return `/map?${baseParams.toString()}`
+  }
+
   const openMapView = () => {
     navigate(
-      `/map?stadium=${stadium._id}&lat=${center.lat}&lng=${center.lng}&category=${stadium.category || ""}&follow=0`,
+      buildMapUrl({
+        lat: center.lat,
+        lng: center.lng,
+        follow: 0,
+      }),
     )
   }
 
   const openMapForAreaCreation = () => {
     navigate(
-      `/map?stadium=${stadium._id}&lat=${center.lat}&lng=${center.lng}&draw=1&category=${stadium.category || ""}`,
+      buildMapUrl({
+        lat: center.lat,
+        lng: center.lng,
+        draw: 1,
+      }),
     )
   }
 
   const openAreaOnMap = (area) => {
     const centroid = getAreaCentroid(area) || center
     navigate(
-      `/map?stadium=${stadium._id}&lat=${centroid.lat}&lng=${centroid.lng}&category=${stadium.category || ""}&areaId=${
-        area._id
-      }&follow=0`,
+      buildMapUrl({
+        lat: centroid.lat,
+        lng: centroid.lng,
+        areaId: area._id,
+        follow: 0,
+      }),
     )
   }
 

@@ -182,7 +182,10 @@ export default function MapPage() {
       .then((response) => {
         let data = response.data || []
         if (stadiumName) {
-          data = data.filter((area) => area.stadiumName === stadiumName)
+          const filteredByName = data.filter((area) => area.stadiumName === stadiumName)
+          if (filteredByName.length > 0) {
+            data = filteredByName
+          }
         }
         setParkingAreas(data)
       })
