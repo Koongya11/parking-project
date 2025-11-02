@@ -19,13 +19,28 @@ import { AuthProvider } from "./context/AuthContext"
 import { useKakaoLoader } from "react-kakao-maps-sdk"
 
 export default function App() {
+  const kakaoAppKey = (process.env.REACT_APP_KAKAO_APP_KEY || "").trim()
+
   const [loading, error] = useKakaoLoader({
-    appkey: "3cba1aa3732aedaf48e84e961c8403d8",
+    appkey: kakaoAppKey,
     libraries: ["drawing", "services", "clusterer"],
   })
 
+  if (!kakaoAppKey) {
+    return (
+      <div style={{ padding: 16 }}>
+        Kakao Map 키가 설정되지 않았습니다. 환경 변수를 확인해 주세요.
+      </div>
+    )
+  }
+
   if (loading) return <div style={{ padding: 16 }}>Loading map...</div>
-  if (error) return <div style={{ padding: 16 }}>Failed to load map. Please refresh.</div>
+  if (error)
+    return (
+      <div style={{ padding: 16 }}>
+        Failed to load map. Please refresh or verify your Kakao Platform domain settings.
+      </div>
+    )
 
   return (
     <BrowserRouter>

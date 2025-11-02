@@ -1,9 +1,9 @@
-﻿const User = require("../models/User")
+const User = require("../models/User")
 
 exports.getMe = async (req, res) => {
   try {
     const userId = req.user?.id
-    if (!userId) return res.status(401).json({ message: "?몄쬆???꾩슂?⑸땲??" })
+    if (!userId) return res.status(401).json({ message: "인증이 필요합니다." })
 
     const user = await User.findById(userId)
       .select("-password")
@@ -17,6 +17,8 @@ exports.getMe = async (req, res) => {
     res.json({
       id: user._id,
       email: user.email,
+      name: user.name || "",
+      avatar: user.avatar || "",
       savedAreas: user.savedAreas || [],
     })
   } catch (error) {
@@ -24,4 +26,3 @@ exports.getMe = async (req, res) => {
     res.status(500).json({ message: "Server Error" })
   }
 }
-

@@ -74,9 +74,9 @@ export default function AdminMatches() {
 
   useEffect(() => {
     if (!form.homeTeam) return
-    const selectedTeam = teams.find(t => t._id === form.homeTeam)
+    const selectedTeam = teams.find((t) => t._id === form.homeTeam)
     if (!selectedTeam) return
-    setForm(prev => {
+    setForm((prev) => {
       const nextCategory = selectedTeam.category
       const stadiumId = getStadiumIdValue(selectedTeam.homeStadium?.stadiumId)
       const nextStadium = prev.stadium || stadiumId
@@ -85,10 +85,10 @@ export default function AdminMatches() {
     })
   }, [form.homeTeam, teams])
 
-  const save = async (e) => {
-    e.preventDefault()
+  const save = async (event) => {
+    event.preventDefault()
     if (!form.league || !form.homeTeam || !form.awayTeam || !form.startAt) {
-      alert("필수값을 입력하세요.")
+      alert("필수값을 모두 입력해 주세요.")
       return
     }
 
@@ -100,7 +100,7 @@ export default function AdminMatches() {
       }
 
       await api.post("/matches", payload)
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         league: "",
         homeTeam: "",
@@ -117,7 +117,7 @@ export default function AdminMatches() {
   }
 
   const del = async (id) => {
-    if (!window.confirm("삭제하시겠습니까?")) return
+    if (!window.confirm("정말 삭제하시겠습니까?")) return
     try {
       await api.delete(`/matches/${id}`)
       load()
@@ -128,74 +128,157 @@ export default function AdminMatches() {
     }
   }
 
-  const teamOptions = useMemo(() => teams.map(t => ({ value: t._id, label: t.name })), [teams])
-  const stadiumOptions = useMemo(() => stadiums.map(s => ({ value: s._id, label: s.stadiumName })), [stadiums])
+  const teamOptions = useMemo(() => teams.map((t) => ({ value: t._id, label: t.name })), [teams])
+  const stadiumOptions = useMemo(
+    () => stadiums.map((s) => ({ value: s._id, label: s.stadiumName })),
+    [stadiums],
+  )
 
   return (
-    <div className="container">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>경기일정 관리</h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => navigate("/admin")}>관리자 홈</button>
-          <button onClick={() => { localStorage.removeItem("ADMIN_TOKEN"); navigate("/admin/login", { replace: true }) }}>로그아웃</button>
+    <div className="admin-page">
+      <header className="admin-header">
+        <div>
+          <h1 className="admin-header__title">경기 일정 관리</h1>
+          <p className="page-hero__subtitle">
+            종목별 경기 일정을 등록하고 확인합니다. 홈·원정 팀, 경기장 정보를 정확히 입력해 주세요.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button type="button" className="cta-button" onClick={() => navigate("/admin")}>
+            관리자 홈
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem("ADMIN_TOKEN")
+              navigate("/admin/login", { replace: true })
+            }}
+          >
+            로그아웃
+          </button>
+        </div>
+      </header>
+
+      <div className="admin-toolbar">
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <label>
+            카테고리
+            <select
+              value={qCategory}
+              onChange={(event) => {
+                const value = event.target.value
+                setQCategory(value)
+                setForm((prev) => ({ ...prev, category: value || prev.category }))
+              }}
+            >
+              <option value="">전체</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            시작 시각
+            <input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />
+          </label>
+          <label>
+            종료 시각
+            <input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} />
+          </label>
+          <button type="button" onClick={load}>
+            새로고침
+          </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "8px 0 16px" }}>
-        <strong>필터:</strong>
-        <select
-          value={qCategory}
-          onChange={e => {
-            const value = e.target.value
-            setQCategory(value)
-            setForm(prev => ({ ...prev, category: value || prev.category }))
-          }}
-        >
-          <option value="">전체</option>
-          {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input type="datetime-local" value={from} onChange={e => setFrom(e.target.value)} />
-        <span>~</span>
-        <input type="datetime-local" value={to} onChange={e => setTo(e.target.value)} />
-        <button onClick={load}>새로고침</button>
-      </div>
-
-      <form onSubmit={save} style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8, marginBottom: 16 }}>
-        <select value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}>
-          {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input placeholder="리그명" value={form.league} onChange={e => setForm(prev => ({ ...prev, league: e.target.value }))} />
-        <select value={form.homeTeam} onChange={e => setForm(prev => ({ ...prev, homeTeam: e.target.value }))}>
-          <option value="">홈팀 선택</option>
-          {teamOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-        <select value={form.awayTeam} onChange={e => setForm(prev => ({ ...prev, awayTeam: e.target.value }))}>
-          <option value="">원정팀 선택</option>
-          {teamOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-        <select value={form.stadium} onChange={e => setForm(prev => ({ ...prev, stadium: e.target.value }))}>
-          <option value="">경기장 선택(미선택 시 홈구장)</option>
-          {stadiumOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-        <input type="datetime-local" value={form.startAt} onChange={e => setForm(prev => ({ ...prev, startAt: e.target.value }))} />
-        <button type="submit" style={{ gridColumn: "span 6" }}>추가</button>
+      <form
+        className="admin-form"
+        onSubmit={save}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}
+      >
+        <label>
+          카테고리
+          <select value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}>
+            {CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          리그
+          <input
+            placeholder="예: K리그1"
+            value={form.league}
+            onChange={(event) => setForm((prev) => ({ ...prev, league: event.target.value }))}
+          />
+        </label>
+        <label>
+          홈 팀
+          <select value={form.homeTeam} onChange={(event) => setForm((prev) => ({ ...prev, homeTeam: event.target.value }))}>
+            <option value="">홈 팀 선택</option>
+            {teamOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          원정 팀
+          <select value={form.awayTeam} onChange={(event) => setForm((prev) => ({ ...prev, awayTeam: event.target.value }))}>
+            <option value="">원정 팀 선택</option>
+            {teamOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          경기장
+          <select value={form.stadium} onChange={(event) => setForm((prev) => ({ ...prev, stadium: event.target.value }))}>
+            <option value="">홈 팀 경기장 자동 선택</option>
+            {stadiumOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          경기 시작 시각
+          <input
+            type="datetime-local"
+            value={form.startAt}
+            onChange={(event) => setForm((prev) => ({ ...prev, startAt: event.target.value }))}
+          />
+        </label>
+        <div style={{ gridColumn: "1 / -1", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <button type="submit" className="cta-button" style={{ width: "min(200px, 100%)" }}>
+            경기 등록
+          </button>
+        </div>
       </form>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="admin-table-wrapper">
+        <table className="admin-table">
           <thead>
             <tr>
               <th>카테고리</th>
               <th>리그</th>
-              <th>일시</th>
-              <th>홈</th>
-              <th>원정</th>
+              <th>시작 시각</th>
+              <th>홈 팀</th>
+              <th>원정 팀</th>
               <th>경기장</th>
               <th>액션</th>
             </tr>
           </thead>
           <tbody>
-            {list.map(match => (
+            {list.map((match) => (
               <tr key={match._id}>
                 <td>{match.category}</td>
                 <td>{match.league}</td>
@@ -203,14 +286,20 @@ export default function AdminMatches() {
                 <td>{match.homeTeam?.name || match.homeTeam}</td>
                 <td>{match.awayTeam?.name || match.awayTeam}</td>
                 <td>{match.stadium?.stadiumName || ""}</td>
-                <td style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => del(match._id)}>삭제</button>
+                <td>
+                  <div className="admin-table__actions">
+                    <button type="button" onClick={() => del(match._id)}>
+                      삭제
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {list.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>데이터 없음</td>
+                <td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>
+                  등록된 경기가 없습니다.
+                </td>
               </tr>
             )}
           </tbody>

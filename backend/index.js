@@ -1,4 +1,6 @@
-﻿const express = require('express')
+const path = require('path')
+const fs = require('fs')
+const express = require('express')
 const cors = require('cors')
 const connectDB = require('./config/db')
 const stadiumRoutes = require('./routes/stadiumRoutes')
@@ -17,6 +19,10 @@ const port = 5000
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+const uploadsRoot = path.join(__dirname, 'uploads')
+fs.mkdirSync(uploadsRoot, { recursive: true })
+app.use('/uploads', express.static(uploadsRoot))
 
 app.use('/api/auth', authRoutes)
 app.use('/api/parking-areas', parkingAreaRoutes)

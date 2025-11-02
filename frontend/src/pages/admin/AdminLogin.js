@@ -5,20 +5,37 @@ export default function AdminLogin() {
   const [token, setToken] = useState("")
   const navigate = useNavigate()
 
-  const submit = (e) => {
-    e.preventDefault()
-    if (!token) return alert("토큰을 입력하세요")
+  const submit = (event) => {
+    event.preventDefault()
+    if (!token) {
+      alert("관리자 토큰을 입력해 주세요.")
+      return
+    }
     localStorage.setItem("ADMIN_TOKEN", token)
     navigate("/admin")
   }
 
   return (
-    <div className="container">
-      <h1>관리자 로그인</h1>
-      <form onSubmit={submit} style={{ display: "grid", gap: 8, maxWidth: 360 }}>
-        <input value={token} onChange={e=>setToken(e.target.value)} placeholder="ADMIN_TOKEN" />
-        <button type="submit">로그인</button>
-      </form>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div>
+          <h1>관리자 로그인</h1>
+          <p className="page-hero__subtitle" style={{ marginTop: 10 }}>
+            발급받은 관리자 토큰을 입력하면 데이터 관리 페이지로 이동합니다.
+          </p>
+        </div>
+
+        <form onSubmit={submit}>
+          <input
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            placeholder="ADMIN_TOKEN"
+          />
+          <button type="submit" className="cta-button">
+            로그인
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

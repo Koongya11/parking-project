@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react"
+import React, { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import api from "../../api"
 import { useAuth } from "../../context/AuthContext"
@@ -10,15 +10,17 @@ export default function UserLogin() {
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  const submit = async (e) => {
-    e.preventDefault()
-    if (!email || !password) return alert("이메일과 비밀번호를 입력하세요.")
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!email || !password) {
+      alert("이메일과 비밀번호를 입력해 주세요.")
+      return
+    }
     setLoading(true)
     try {
       const { data } = await api.post("/auth/login", { email, password })
       login(data.token)
-      alert("로그인되었습니다.")
-      navigate("/")
+      navigate("/", { replace: true })
     } catch (err) {
       console.error("login failed", err)
       const message = err?.response?.data?.message || "로그인에 실패했습니다."
@@ -29,26 +31,37 @@ export default function UserLogin() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 420 }}>
-      <h1>로그인</h1>
-      <form onSubmit={submit} style={{ display: "grid", gap: 12 }}>
-        <input
-          type="email"
-          placeholder="이메일"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="비밀번호"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-        <button type="submit" disabled={loading}>{loading ? "로그인 중..." : "로그인"}</button>
-      </form>
-      <p style={{ marginTop: 16 }}>
-        아직 계정이 없으신가요? <Link to="/register">회원가입</Link>
-      </p>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div>
+          <h1>로그인</h1>
+          <p className="page-hero__subtitle" style={{ marginTop: 10 }}>
+            저장한 주차장과 맞춤 길찾기 기능을 이용하려면 계정으로 로그인해 주세요.
+          </p>
+        </div>
+
+        <form onSubmit={submit}>
+          <input
+            type="email"
+            placeholder="이메일"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="비밀번호"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <button type="submit" className="cta-button" disabled={loading}>
+            {loading ? "로그인 중..." : "로그인"}
+          </button>
+        </form>
+
+        <p className="auth-card__footer">
+          아직 계정이 없으신가요? <Link to="/register">회원가입</Link>
+        </p>
+      </div>
     </div>
   )
 }

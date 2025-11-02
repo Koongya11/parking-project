@@ -38,6 +38,8 @@ const parkingAreaSchema = new mongoose.Schema({
   upvoteCount: { type: Number, default: 0 },
   congestionScoreSum: { type: Number, default: 0 },
   congestionScoreCount: { type: Number, default: 0 },
+  congestionLastResetAt: { type: Date, default: Date.now },
+  congestionLastFeedbackAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
 })
 

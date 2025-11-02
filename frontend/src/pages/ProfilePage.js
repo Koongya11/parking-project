@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import api from "../api"
@@ -26,23 +26,41 @@ export default function ProfilePage() {
 
   if (!isLoggedIn) {
     return (
-      <div className="container">
-        <h1>내 프로필</h1>
-        <p style={{ marginTop: 12, color: "#64748b" }}>로그인 후 저장한 주차 구역을 확인할 수 있습니다.</p>
+      <div className="page page--narrow">
+        <section className="page-hero">
+          <h1 className="page-hero__title">내 주차장 목록</h1>
+          <p className="page-hero__subtitle">
+            로그인하면 저장한 주차 구역과 길찾기 기록을 한눈에 확인할 수 있습니다.
+          </p>
+        </section>
+        <div className="empty-state">
+          아직 로그인되지 않았어요.<br />
+          상단 메뉴의 로그인 버튼을 눌러 서비스를 이용해 주세요.
+        </div>
       </div>
     )
   }
 
   if (loadingUser && !user) {
     return (
-      <div className="container">
-        <h1>내 프로필</h1>
-        <p style={{ marginTop: 12, color: "#64748b" }}>프로필 정보를 불러오는 중입니다...</p>
+      <div className="page page--narrow">
+        <section className="page-hero">
+          <h1 className="page-hero__title">내 주차장 목록</h1>
+          <p className="page-hero__subtitle">내 데이터와 즐겨찾는 주차장을 불러오는 중입니다…</p>
+        </section>
       </div>
     )
   }
 
   const savedAreas = user?.savedAreas || []
+
+  const openArea = (area) => {
+    if (!area) return
+    const centroid = getAreaCentroid(area)
+    const lat = centroid ? centroid.lat : 37.566826
+    const lng = centroid ? centroid.lng : 126.9786567
+    navigate(`/map?areaId=${area._id}&lat=${lat}&lng=${lng}&follow=0`)
+  }
 
   const handleUnsave = async (event, areaId) => {
     event.stopPropagation()
@@ -53,53 +71,41 @@ export default function ProfilePage() {
       const { data } = await api.post(`/parking-areas/${areaId}/save`)
       await refreshUser()
       if (data?.saved === false) {
-        alert("이 주차 구역 저장이 취소되었습니다.")
+        alert("주차장이 즐겨찾기에서 삭제되었습니다.")
       } else if (data?.saved === true) {
-        alert("이 주차 구역이 다시 저장되었습니다.")
+        alert("주차장이 다시 저장되었습니다.")
       }
     } catch (error) {
-      console.error("Failed to unsave parking area:", error)
-      const message = error?.response?.data?.message || "저장을 취소할 수 없습니다."
+      console.error("Failed to toggle saved parking area:", error)
+      const message = error?.response?.data?.message || "즐겨찾기 작업을 완료할 수 없습니다."
       alert(message)
     } finally {
       setUnsavingId("")
     }
   }
 
-  const openArea = (area) => {
-    if (!area) return
-    const centroid = getAreaCentroid(area)
-    const lat = centroid ? centroid.lat : 37.566826
-    const lng = centroid ? centroid.lng : 126.9786567
-    navigate(`/map?areaId=${area._id}&lat=${lat}&lng=${lng}&follow=0`)
-  }
-
   return (
-    <div className="container">
-      <h1>내 프로필</h1>
-      <p style={{ marginTop: 12, color: "#475569" }}>현재 계정으로 저장한 주차 구역 목록입니다.</p>
+    <div className="page page--narrow">
+      <section className="page-hero">
+        <h1 className="page-hero__title">내 주차장 목록</h1>
+        <p className="page-hero__subtitle">
+          저장한 주차 공간을 모아보고, 다시 길찾기를 시작하거나 즐겨찾기에서 제거할 수 있습니다.
+        </p>
+      </section>
 
       {savedAreas.length === 0 ? (
-        <div style={{ padding: 20, border: "1px dashed #e2e8f0", borderRadius: 12, color: "#94a3b8", marginTop: 20 }}>
-          아직 저장한 주차 구역이 없습니다. 지도의 "이 구역 저장" 버튼을 눌러 주차 구역을 저장해 보세요.
+        <div className="empty-state">
+          아직 즐겨찾기한 주차장이 없습니다.<br />
+          지도에서 원하는 주차장을 선택하고 “내 즐겨찾기” 버튼을 눌러 저장해 보세요.
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 12, marginTop: 20 }}>
+        <div className="profile-page__list">
           {savedAreas.map((area) => (
-            <div
-              key={area._id}
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: 12,
-                padding: 16,
-                background: "#fff",
-                display: "grid",
-                gap: 10,
-              }}
-            >
+            <div key={area._id} className="profile-card">
               <div
                 role="button"
                 tabIndex={0}
+                className="profile-card__body"
                 onClick={() => openArea(area)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -107,51 +113,25 @@ export default function ProfilePage() {
                     openArea(area)
                   }
                 }}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  cursor: "pointer",
-                }}
               >
                 <div>
-                  <h3 style={{ margin: 0 }}>{area.title}</h3>
-                  <p style={{ margin: "6px 0 0", color: "#475569" }}>{area.stadiumName}</p>
+                  <h3 className="surface-card__title">{area.title}</h3>
+                  <p className="surface-card__desc" style={{ marginTop: 6 }}>{area.stadiumName}</p>
                 </div>
-                <span style={{ color: "#94a3b8", fontSize: 13 }}>
+                <span className="list-card__meta">
                   저장일 {area.createdAt ? new Date(area.createdAt).toLocaleDateString() : "-"}
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => openArea(area)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #cbd5f5",
-                    background: "#eef2ff",
-                    cursor: "pointer",
-                    fontSize: 13,
-                  }}
-                >
+              <div className="profile-card__actions">
+                <button type="button" onClick={() => openArea(area)}>
                   지도에서 보기
                 </button>
                 <button
                   type="button"
                   onClick={(event) => handleUnsave(event, area._id)}
                   disabled={unsavingId === area._id}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #fca5a5",
-                    background: unsavingId === area._id ? "#fecaca" : "#fee2e2",
-                    color: "#b91c1c",
-                    cursor: unsavingId === area._id ? "wait" : "pointer",
-                    fontSize: 13,
-                  }}
                 >
-                  {unsavingId === area._id ? "해제 중..." : "저장 취소"}
+                  {unsavingId === area._id ? "처리 중..." : "즐겨찾기 해제"}
                 </button>
               </div>
             </div>

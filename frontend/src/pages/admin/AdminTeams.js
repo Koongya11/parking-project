@@ -36,12 +36,12 @@ const getIdValue = (value) => {
 }
 
 export default function AdminTeams() {
+  const navigate = useNavigate()
   const [qCategory, setQCategory] = useState(INITIAL_CATEGORY)
   const [teams, setTeams] = useState([])
   const [form, setForm] = useState(() => createInitialForm(INITIAL_CATEGORY))
   const [editingId, setEditingId] = useState(null)
   const [logoPreview, setLogoPreview] = useState("")
-  const navigate = useNavigate()
 
   useEffect(() => {
     const token = localStorage.getItem("ADMIN_TOKEN")
@@ -72,23 +72,23 @@ export default function AdminTeams() {
 
   const handleFile = (file) => {
     if (!file) {
-      setForm(prev => ({ ...prev, logoImage: "" }))
+      setForm((prev) => ({ ...prev, logoImage: "" }))
       setLogoPreview("")
       return
     }
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result
-      setForm(prev => ({ ...prev, logoImage: typeof result === "string" ? result : "" }))
+      setForm((prev) => ({ ...prev, logoImage: typeof result === "string" ? result : "" }))
       setLogoPreview(typeof result === "string" ? result : "")
     }
     reader.readAsDataURL(file)
   }
 
-  const submit = async (e) => {
-    e.preventDefault()
-    if (!form.category || !form.name) return alert("카테고리와 팀명을 입력하세요.")
-    if (!form.stadiumName) return alert("홈구장 이름을 입력하세요.")
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!form.category || !form.name) return alert("카테고리와 팀명을 입력해 주세요.")
+    if (!form.stadiumName) return alert("홈구장 이름을 입력해 주세요.")
 
     try {
       const payload = {
@@ -122,96 +122,151 @@ export default function AdminTeams() {
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm("삭제하시겠습니까?")) return
+    if (!window.confirm("정말 삭제하시겠습니까?")) return
     try {
       await api.delete(`/teams/${id}`)
       if (editingId === id) resetForm()
       load()
     } catch (err) {
       console.error("delete team failed", err)
-      const message = err?.response?.data?.message || "팀 삭제에 실패했습니다."
-      alert(message)
+      alert("삭제에 실패했습니다.")
     }
   }
 
   const handleEdit = (team) => {
-    const coordinates = Array.isArray(team.homeStadium?.location?.coordinates)
-      ? team.homeStadium.location.coordinates
-      : []
-    const lat = coordinates.length === 2 ? String(coordinates[1]) : String(DEFAULT_LOCATION.lat)
-    const lng = coordinates.length === 2 ? String(coordinates[0]) : String(DEFAULT_LOCATION.lng)
-
     setEditingId(team._id)
+    const home = team.homeStadium || {}
+    const coords = Array.isArray(home.location?.coordinates)
+      ? home.location.coordinates
+      : [toNumberOrFallback(home.lng, DEFAULT_LOCATION.lng), toNumberOrFallback(home.lat, DEFAULT_LOCATION.lat)]
+
     setForm({
       category: team.category,
-      name: team.name || "",
-      stadiumId: getIdValue(team.homeStadium?.stadiumId),
-      stadiumName: team.homeStadium?.name || "",
-      stadiumCity: team.homeStadium?.city || "",
-      stadiumLat: lat,
-      stadiumLng: lng,
-      logoImage: team.logoImage || team.homeStadium?.logoImage || "",
+      name: team.name,
+      stadiumId: getIdValue(home.stadiumId),
+      stadiumName: home.name || team.homeStadium?.stadiumId?.stadiumName || "",
+      stadiumCity: home.city || team.city || "",
+      stadiumLat: String(toNumberOrFallback(coords[1], DEFAULT_LOCATION.lat)),
+      stadiumLng: String(toNumberOrFallback(coords[0], DEFAULT_LOCATION.lng)),
+      logoImage: team.logoImage || "",
     })
-    setLogoPreview(team.logoImage || team.homeStadium?.logoImage || "")
+    setLogoPreview(team.logoImage || "")
   }
 
-  const currentLat = toNumberOrFallback(form.stadiumLat, DEFAULT_LOCATION.lat)
-  const currentLng = toNumberOrFallback(form.stadiumLng, DEFAULT_LOCATION.lng)
+  const currentLat = Number(form.stadiumLat) || DEFAULT_LOCATION.lat
+  const currentLng = Number(form.stadiumLng) || DEFAULT_LOCATION.lng
 
   return (
-    <div className="container">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>팀 관리</h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => navigate("/admin")}>관리자 홈</button>
-          <button onClick={logout}>로그아웃</button>
+    <div className="admin-page">
+      <header className="admin-header">
+        <div>
+          <h1 className="admin-header__title">팀 관리</h1>
+          <p className="page-hero__subtitle">
+            종목별 팀과 홈구장 정보를 관리합니다. 경기장 위치와 로고를 최신 상태로 유지해 주세요.
+          </p>
+        </div>
+        <button type="button" className="cta-button" onClick={logout}>
+          로그아웃
+        </button>
+      </header>
+
+      <div className="admin-toolbar">
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <label>
+            카테고리
+            <select
+              value={qCategory}
+              onChange={(event) => {
+                const value = event.target.value
+                setQCategory(value)
+                setForm((prev) => ({ ...prev, category: value || prev.category }))
+              }}
+            >
+              <option value="">전체</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={load}>
+            새로고침
+          </button>
+          {editingId && (
+            <button type="button" onClick={() => resetForm(form.category)}>
+              새 팀 추가로 전환
+            </button>
+          )}
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "8px 0 16px" }}>
-        <strong>필터:</strong>
-        <select
-          value={qCategory}
-          onChange={e => {
-            const value = e.target.value
-            setQCategory(value)
-            setForm(prev => ({ ...prev, category: value || prev.category }))
-          }}
-        >
-          <option value="">전체</option>
-          {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <button onClick={load}>새로고침</button>
-        {editingId && <button onClick={() => resetForm(form.category)}>새 팀 추가로 전환</button>}
-      </div>
-
-      <form onSubmit={submit} style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8, marginBottom: 16 }}>
-        <div style={{ gridColumn: "span 6", display: "flex", gap: 16, alignItems: "center" }}>
-          <div style={{ width: 96, height: 96, border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
+      <form className="admin-form" onSubmit={submit}>
+        <div className="admin-form__row" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ width: 96, height: 96, borderRadius: 18, border: "1px dashed #cbd5f5", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", overflow: "hidden" }}>
             {logoPreview ? (
               <img src={logoPreview} alt="팀 로고 미리보기" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             ) : (
               <span style={{ color: "#94a3b8", fontSize: 12 }}>로고 미리보기</span>
             )}
           </div>
-          <div>
-            <label style={{ fontWeight: 600 }}>구단 마크 업로드</label>
-            <input type="file" accept="image/*" onChange={e => handleFile(e.target.files?.[0] || null)} />
+          <div style={{ display: "grid", gap: 8 }}>
+            <label style={{ fontWeight: 600 }}>
+              구단 마크 업로드
+              <input type="file" accept="image/*" onChange={(event) => handleFile(event.target.files?.[0] || null)} />
+            </label>
             {form.logoImage && (
-              <button type="button" style={{ marginTop: 8 }} onClick={() => handleFile(null)}>이미지 제거</button>
+              <button type="button" onClick={() => handleFile(null)}>
+                이미지 제거
+              </button>
             )}
           </div>
         </div>
 
-        <div style={{ gridColumn: "span 6" }}>
-          <h3 style={{ marginBottom: 8 }}>홈구장 위치 선택</h3>
+        <div className="admin-form__row">
+          <label>
+            카테고리
+            <select value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}>
+              {CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            팀명
+            <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+          </label>
+        </div>
+
+        <div className="admin-form__row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+          <label>
+            홈구장 이름
+            <input
+              value={form.stadiumName}
+              onChange={(event) => setForm((prev) => ({ ...prev, stadiumName: event.target.value }))}
+              placeholder="예: 상암월드컵경기장"
+            />
+          </label>
+          <label>
+            도시
+            <input
+              value={form.stadiumCity}
+              onChange={(event) => setForm((prev) => ({ ...prev, stadiumCity: event.target.value }))}
+              placeholder="예: 서울특별시"
+            />
+          </label>
+        </div>
+
+        <div className="admin-form__map">
           <Map
             center={{ lat: currentLat, lng: currentLng }}
-            style={{ width: "100%", height: "360px" }}
             level={3}
+            style={{ width: "100%", height: 360 }}
             onClick={(_, mouseEvent) => {
               const latlng = mouseEvent.latLng
-              setForm(prev => ({
+              setForm((prev) => ({
                 ...prev,
                 stadiumLat: String(latlng.getLat()),
                 stadiumLng: String(latlng.getLng()),
@@ -222,77 +277,83 @@ export default function AdminTeams() {
           </Map>
         </div>
 
-        <select value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}>
-          {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input placeholder="팀명" value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} />
+        <div className="admin-form__row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+          <label>
+            경도 (lng)
+            <input
+              value={form.stadiumLng}
+              onChange={(event) => setForm((prev) => ({ ...prev, stadiumLng: event.target.value }))}
+            />
+          </label>
+          <label>
+            위도 (lat)
+            <input
+              value={form.stadiumLat}
+              onChange={(event) => setForm((prev) => ({ ...prev, stadiumLat: event.target.value }))}
+            />
+          </label>
+        </div>
 
-        <input
-          style={{ gridColumn: "span 3" }}
-          placeholder="홈구장 이름"
-          value={form.stadiumName}
-          onChange={e => setForm(prev => ({ ...prev, stadiumName: e.target.value }))}
-        />
-        <input
-          style={{ gridColumn: "span 3" }}
-          placeholder="홈구장 도시"
-          value={form.stadiumCity}
-          onChange={e => setForm(prev => ({ ...prev, stadiumCity: e.target.value }))}
-        />
-        <input
-          placeholder="경도(lng)"
-          value={form.stadiumLng}
-          onChange={e => setForm(prev => ({ ...prev, stadiumLng: e.target.value }))}
-        />
-        <input
-          placeholder="위도(lat)"
-          value={form.stadiumLat}
-          onChange={e => setForm(prev => ({ ...prev, stadiumLat: e.target.value }))}
-        />
-        <button type="submit" style={{ gridColumn: editingId ? "span 3" : "span 6" }}>{editingId ? "수정 완료" : "추가"}</button>
-        {editingId && <button type="button" style={{ gridColumn: "span 3" }} onClick={() => resetForm(form.category)}>취소</button>}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button type="submit" className="cta-button">
+            {editingId ? "팀 정보 수정" : "새 팀 등록"}
+          </button>
+          {editingId && (
+            <button type="button" onClick={() => resetForm(form.category)}>
+              취소
+            </button>
+          )}
+        </div>
       </form>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="admin-table-wrapper">
+        <table className="admin-table">
           <thead>
             <tr>
               <th>로고</th>
               <th>카테고리</th>
               <th>팀명</th>
               <th>홈구장</th>
-              <th>위치(lng,lat)</th>
+              <th>좌표</th>
               <th>액션</th>
             </tr>
           </thead>
           <tbody>
-            {teams.map(team => {
+            {teams.map((team) => {
               const coords = Array.isArray(team.homeStadium?.location?.coordinates)
-                ? team.homeStadium.location.coordinates.join(', ')
-                : ''
+                ? team.homeStadium.location.coordinates.join(", ")
+                : ""
               return (
                 <tr key={team._id}>
                   <td>
                     {team.logoImage ? (
                       <img src={team.logoImage} alt={`${team.name} 로고`} style={{ width: 48, height: 48, objectFit: "contain" }} />
                     ) : (
-                      <span style={{ color: "#94a3b8", fontSize: 12 }}>미등록</span>
+                      <span style={{ color: "#94a3b8", fontSize: 12 }}>없음</span>
                     )}
                   </td>
                   <td>{team.category}</td>
                   <td>{team.name}</td>
                   <td>{team.homeStadium?.name}</td>
                   <td>{coords}</td>
-                  <td style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => handleEdit(team)}>수정</button>
-                    <button onClick={() => handleDelete(team._id)}>삭제</button>
+                  <td>
+                    <div className="admin-table__actions">
+                      <button type="button" onClick={() => handleEdit(team)}>
+                        수정
+                      </button>
+                      <button type="button" onClick={() => handleDelete(team._id)}>
+                        삭제
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )
             })}
             {teams.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: "#6b7280" }}>데이터 없음</td>
+                <td colSpan={6} style={{ textAlign: "center", color: "#6b7280" }}>
+                  등록된 팀이 없습니다.
+                </td>
               </tr>
             )}
           </tbody>
