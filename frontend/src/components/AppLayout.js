@@ -77,63 +77,65 @@ export default function AppLayout() {
     <div className={`app-layout${hideTopNav ? " app-layout--chromeless" : ""}`}>
       {!hideTopNav && (
         <header className="top-nav">
-          <div className="top-nav__left">
-            {showBackButton && (
+          <div className="top-nav__inner">
+            <div className="top-nav__left">
+              {showBackButton && (
+                <button
+                  type="button"
+                  className="back-button top-nav__back"
+                  onClick={handleBack}
+                  aria-label="뒤로가기"
+                >
+                  {"\u2190"}
+                </button>
+              )}
               <button
                 type="button"
-                className="back-button top-nav__back"
-                onClick={handleBack}
-                aria-label="뒤로가기"
-              >
-                {"\u2190"}
-              </button>
-            )}
-            <button
-              type="button"
-              className="sidebar-toggle"
-              onClick={toggleSidebar}
-              aria-expanded={sidebarOpen}
-              aria-controls="global-sidebar"
+                className="sidebar-toggle"
+                onClick={toggleSidebar}
+                aria-expanded={sidebarOpen}
+                aria-controls="global-sidebar"
               >
                 메뉴
               </button>
-          </div>
+            </div>
 
-          <Link to="/" className="top-nav__brand">
-            주차 정보 지도
-          </Link>
+            <Link to="/" className="top-nav__brand">
+              주차 정보 지도
+            </Link>
 
-          <div className="top-nav__actions">
-            {isLoggedIn ? (
-              <div className="profile" ref={menuRef}>
-                <button
-                  type="button"
-                  className="profile__trigger"
-                  onClick={() => setMenuOpen((prev) => !prev)}
-                >
-                  내 프로필
-                </button>
-                {menuOpen && (
-                  <div className="profile__menu">
-                    <button type="button" onClick={handleProfileClick}>
-                      계정 관리
-                    </button>
-                    <button type="button" onClick={handleLogout}>
-                      로그아웃
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <button type="button" onClick={() => navigate("/login")}>
-                  로그인
-                </button>
-                <button type="button" onClick={() => navigate("/register")}>
-                  회원가입
-                </button>
-              </>
-            )}
+            <div className="top-nav__actions">
+              {isLoggedIn ? (
+                <div className="profile" ref={menuRef}>
+                  <button
+                    type="button"
+                    className="profile__trigger"
+                    onClick={() => setMenuOpen((prev) => !prev)}
+                  >
+                    내 프로필
+                  </button>
+                  {menuOpen && (
+                    <div className="profile__menu">
+                      <button type="button" onClick={handleProfileClick}>
+                        계정 관리
+                      </button>
+                      <button type="button" onClick={handleLogout}>
+                        로그아웃
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <button type="button" onClick={() => navigate("/login")}>
+                    로그인
+                  </button>
+                  <button type="button" onClick={() => navigate("/register")}>
+                    회원가입
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </header>
       )}
