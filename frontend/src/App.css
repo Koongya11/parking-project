@@ -957,6 +957,141 @@
   color: #64748b;
 }
 
+.home-highlight {
+  margin-top: 32px;
+  padding: 28px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #e0f3ff, #eef2ff);
+  display: grid;
+  gap: 24px;
+}
+
+.home-highlight__copy {
+  display: grid;
+  gap: 10px;
+  color: #0f172a;
+}
+
+.home-highlight__kicker {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.home-highlight h2 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.home-highlight p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.home-highlight__error {
+  margin: 0;
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.stats-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.stat-card {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 18px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, .25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+
+.stat-card__label {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.stat-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.stat-card__desc {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.home-games-section {
+  margin-top: 16px;
+}
+
+.match-list {
+  display: grid;
+  gap: 12px;
+}
+
+.match-card {
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: #f8fbff;
+  flex-wrap: wrap;
+}
+
+.match-card__body {
+  display: grid;
+  gap: 4px;
+}
+
+.match-card__stadium {
+  font-size: 13px;
+  color: #475569;
+}
+
+.match-card__match {
+  font-size: 16px;
+}
+
+.match-card__time {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.match-card__status {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.match-card__status--busy {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.match-card__status--free {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.match-card__status--normal {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
 .card-grid {
   display: grid;
   gap: 16px;
@@ -1437,11 +1572,11 @@
 }
 
 .community-board {
-  border: 1px solid #dbeafe;
+  border: 1px solid #e2e8f0;
   border-radius: 18px;
   overflow: hidden;
-  background: #ffffff;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, .08);
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 25%);
+  box-shadow: 0 20px 35px rgba(15, 23, 42, 0.08);
 }
 
 .community-board__header,
@@ -1465,22 +1600,30 @@
 }
 
 .community-board__row {
-  padding: 14px 20px;
+  padding: 16px 24px;
   text-align: left;
   font-size: 14px;
   color: #1f2937;
-  border-top: 1px solid #e2e8f0;
-  transition: background 0.2s ease;
+  border: none;
+  border-bottom: 1px solid #eef2ff;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.community-board__row:last-child {
+  border-bottom: none;
 }
 
 .community-board__row:hover {
-  background: #f8fafc;
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px #dbeafe;
 }
 
 .community-board__row.is-active {
   background: #eff6ff;
-  border-left: 4px solid #2563eb;
-  padding-left: 16px;
+  box-shadow: inset 0 0 0 2px #2563eb;
 }
 
 .community-board__row span {
@@ -1842,26 +1985,52 @@
     font-size: 12px;
   }
 
+  .home-highlight {
+    padding: 22px;
+  }
+
+  .home-highlight h2 {
+    font-size: 22px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .match-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .top-nav {
     padding: 10px 16px;
-    flex-wrap: wrap;
-    row-gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    row-gap: 10px;
   }
 
   .top-nav__left {
-    flex: 1 1 100%;
-    justify-content: space-between;
+    flex: 1 1 auto;
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
     gap: 8px;
   }
 
   .top-nav__actions {
-    flex: 1 1 100%;
-    justify-content: flex-end;
+    flex: 1 1 auto;
+    width: 100%;
+    justify-content: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .top-nav__brand {
     font-size: 16px;
+    flex: 0 0 100%;
+    text-align: center;
+    margin-top: 4px;
   }
 
   .top-nav__actions button,

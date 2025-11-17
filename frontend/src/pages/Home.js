@@ -1,9 +1,126 @@
-import React from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import api from "../api"
 import CATEGORIES from "../data/categories"
+
+const MATCH_RANGE_DAYS = 7
+
+const formatNumber = (value) => {
+  if (typeof value !== "number" || Number.isNaN(value)) return "0"
+  return value.toLocaleString("ko-KR")
+}
 
 export default function Home() {
   const navigate = useNavigate()
+  const [stats, setStats] = useState({
+    stadiums: null,
+    parkingAreas: null,
+    matchesWeek: null,
+  })
+  const [highlightMatches, setHighlightMatches] = useState([])
+  const [loadingHomeData, setLoadingHomeData] = useState(true)
+  const [homeError, setHomeError] = useState("")
+
+  useEffect(() => {
+    let active = true
+
+    const fetchHomeData = async () => {
+      setLoadingHomeData(true)
+      setHomeError("")
+
+      try {
+        const now = new Date()
+        const end = new Date()
+        end.setDate(now.getDate() + MATCH_RANGE_DAYS)
+
+        const [stadiumRes, parkingRes, matchRes] = await Promise.all([
+          api.get("/stadiums"),
+          api.get("/parking-areas"),
+          api.get("/matches", {
+            params: {
+              from: now.toISOString(),
+              to: end.toISOString(),
+            },
+          }),
+        ])
+
+        if (!active) return
+
+        const stadiumList = Array.isArray(stadiumRes.data) ? stadiumRes.data : []
+        const parkingList = Array.isArray(parkingRes.data) ? parkingRes.data : []
+        const matchList = Array.isArray(matchRes.data) ? matchRes.data : []
+
+        setStats({
+          stadiums: stadiumList.length,
+          parkingAreas: parkingList.length,
+          matchesWeek: matchList.length,
+        })
+
+        const normalizedMatches = matchList
+          .map((match) => {
+            const startAt = new Date(match.startAt)
+            const timestamp = startAt.getTime()
+            const home = match.homeTeam?.name || match.homeTeam || "-"
+            const away = match.awayTeam?.name || match.awayTeam || "-"
+            const stadiumName = match.stadium?.stadiumName || match.stadiumName || ""
+            const isValidStart = !Number.isNaN(timestamp)
+            const diffHours = isValidStart ? (timestamp - now.getTime()) / (1000 * 60 * 60) : Infinity
+
+            let statusTone = "normal"
+            let status = "보통"
+            if (diffHours <= 4) {
+              statusTone = "busy"
+              status = "곧 시작"
+            } else if (diffHours <= 24) {
+              statusTone = "busy"
+              status = "혼잡 예상"
+            } else if (diffHours <= 72) {
+              statusTone = "normal"
+              status = "준비하세요"
+            } else {
+              statusTone = "free"
+              status = "여유 있음"
+            }
+
+            return {
+              id: match._id || `${home}-${away}-${match.startAt}`,
+              stadium: stadiumName,
+              matchLabel: `${home} vs ${away}`,
+              timeLabel: isValidStart ? startAt.toLocaleString() : "시간 미정",
+              status,
+              statusTone,
+              startAt: isValidStart ? timestamp : null,
+            }
+          })
+          .filter((match) => match.startAt !== null)
+          .sort((a, b) => a.startAt - b.startAt)
+          .slice(0, 3)
+
+        setHighlightMatches(normalizedMatches)
+      } catch (error) {
+        console.error("failed to load home data", error)
+        if (!active) return
+        setHomeError("실제 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
+        setHighlightMatches([])
+      } finally {
+        if (active) setLoadingHomeData(false)
+      }
+    }
+
+    fetchHomeData()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const statsEntries = useMemo(
+    () => [
+      { label: "등록 경기장", value: stats.stadiums, desc: "전체 카테고리 기준" },
+      { label: "등록 주차 구역", value: stats.parkingAreas, desc: "실측 및 제보 데이터" },
+      { label: "이번 주 예정 경기", value: stats.matchesWeek, desc: "앞으로 7일 기준" },
+    ],
+    [stats.parkingAreas, stats.matchesWeek, stats.stadiums],
+  )
 
   return (
     <div className="page">
@@ -56,6 +173,59 @@ export default function Home() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="home-highlight">
+        <div className="home-highlight__copy">
+          <p className="home-highlight__kicker">이번 주 이용 현황</p>
+          <h2>
+            {typeof stats.stadiums === "number" && typeof stats.parkingAreas === "number"
+              ? `지금 ${formatNumber(stats.stadiums)}개 경기장과 ${formatNumber(stats.parkingAreas)}개 주차 구역이 연결되어 있어요.`
+              : "실제 주차 데이터를 불러오는 중입니다."}
+          </h2>
+          <p>
+            {typeof stats.matchesWeek === "number"
+              ? `앞으로 ${MATCH_RANGE_DAYS}일 동안 ${formatNumber(stats.matchesWeek)}개의 경기가 예정되어 있어요.`
+              : "곧 이번 주 경기 일정이 표시됩니다."}
+          </p>
+          {homeError && <p className="home-highlight__error">{homeError}</p>}
+        </div>
+        <div className="stats-grid">
+          {statsEntries.map((stat) => (
+            <div key={stat.label} className="stat-card">
+              <span className="stat-card__label">{stat.label}</span>
+              <strong className="stat-card__value">
+                {typeof stat.value === "number" ? formatNumber(stat.value) : loadingHomeData ? "—" : "0"}
+              </strong>
+              <span className="stat-card__desc">{stat.desc}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="section home-games-section">
+        <div className="section__head">
+          <h2>이번 주 인기 경기</h2>
+          <span>혼잡 예상 시간과 함께 미리 체크하세요</span>
+        </div>
+        {loadingHomeData ? (
+          <div className="empty-state--subtle">경기 정보를 불러오는 중입니다…</div>
+        ) : highlightMatches.length === 0 ? (
+          <div className="empty-state--subtle">일주일 내 등록된 경기가 없습니다.</div>
+        ) : (
+          <div className="match-list">
+            {highlightMatches.map((game) => (
+              <article key={game.id} className="match-card">
+                <div className="match-card__body">
+                  <span className="match-card__stadium">{game.stadium}</span>
+                  <strong className="match-card__match">{game.matchLabel}</strong>
+                  <span className="match-card__time">{game.timeLabel}</span>
+                </div>
+                <span className={`match-card__status match-card__status--${game.statusTone}`}>{game.status}</span>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

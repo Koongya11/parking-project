@@ -4,6 +4,8 @@ import Home from "./pages/Home"
 import CategoryPage from "./pages/CategoryPage"
 import MapPage from "./pages/MapPage"
 import StadiumPage from "./pages/StadiumPage"
+import CommunityPostPage from "./pages/CommunityPostPage"
+import CommunityPostCreatePage from "./pages/CommunityPostCreatePage"
 import NotFound from "./pages/NotFound"
 import "./App.css"
 import AdminLogin from "./pages/admin/AdminLogin"
@@ -50,6 +52,8 @@ export default function App() {
             <Route index element={<Home />} />
             <Route path="category/:categoryId" element={<CategoryPage />} />
             <Route path="stadium/:id" element={<StadiumPage />} />
+            <Route path="stadium/:id/community/new" element={<CommunityPostCreatePage />} />
+            <Route path="stadium/:id/community/:postId" element={<CommunityPostPage />} />
             <Route path="map" element={<MapPage />} />
             <Route path="login" element={<UserLogin />} />
             <Route path="register" element={<UserRegister />} />
