@@ -94,13 +94,14 @@ export default function AppLayout() {
               onClick={toggleSidebar}
               aria-expanded={sidebarOpen}
               aria-controls="global-sidebar"
-            >
-              메뉴
-            </button>
-            <Link to="/" className="top-nav__brand">
-              주차 정보 지도
-            </Link>
+              >
+                메뉴
+              </button>
           </div>
+
+          <Link to="/" className="top-nav__brand">
+            주차 정보 지도
+          </Link>
 
           <div className="top-nav__actions">
             {isLoggedIn ? (

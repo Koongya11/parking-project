@@ -165,6 +165,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
+  gap: 12px;
+  flex-wrap: nowrap;
   background: #ffffffde;
   backdrop-filter: blur(6px);
   border-bottom: 1px solid #e5e7eb;
@@ -203,12 +205,22 @@
   font-size: 18px;
   color: #111827;
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  min-width: 140px;
+  flex: 0 1 auto;
 }
 
 .top-nav__actions {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1 1 0;
+  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .top-nav__actions button {
@@ -268,6 +280,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .sidebar-toggle {
@@ -2006,37 +2020,20 @@
 
   .top-nav {
     padding: 10px 12px;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: 8px;
-    row-gap: 6px;
+    gap: 8px;
   }
 
   .top-nav__left {
-    flex: 1 1 auto;
-    width: auto;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-start;
     gap: 8px;
   }
 
   .top-nav__actions {
-    flex: 0 0 auto;
-    width: auto;
-    justify-content: flex-end;
     gap: 6px;
-    flex-wrap: nowrap;
   }
 
   .top-nav__brand {
     font-size: 16px;
-    flex-basis: 100%;
-    text-align: center;
-    margin-top: 6px;
-    order: 2;
+    min-width: 0;
   }
 
   .top-nav__actions button,
