@@ -816,6 +816,7 @@
   text-align: left;
   cursor: pointer;
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  width: 100%;
 }
 
 .stadium-card:hover {
@@ -1114,6 +1115,7 @@
   gap: 12px;
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
   text-align: left;
+  width: 100%;
 }
 
 .surface-card:hover {
@@ -2003,15 +2005,18 @@
   }
 
   .top-nav {
-    padding: 10px 16px;
-    flex-direction: column;
-    align-items: stretch;
-    row-gap: 10px;
+    padding: 10px 12px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 6px;
   }
 
   .top-nav__left {
     flex: 1 1 auto;
-    width: 100%;
+    width: auto;
+    min-width: 0;
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
@@ -2019,18 +2024,19 @@
   }
 
   .top-nav__actions {
-    flex: 1 1 auto;
-    width: 100%;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    flex: 0 0 auto;
+    width: auto;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: nowrap;
   }
 
   .top-nav__brand {
     font-size: 16px;
-    flex: 0 0 100%;
+    flex-basis: 100%;
     text-align: center;
-    margin-top: 4px;
+    margin-top: 6px;
+    order: 2;
   }
 
   .top-nav__actions button,
@@ -2049,7 +2055,7 @@
   }
 
   .category-page {
-    padding: 20px 12px 60px;
+    padding: 20px 8px 60px;
     gap: 24px;
   }
 
@@ -2085,7 +2091,7 @@
   }
 
   .page {
-    padding: 24px 12px 72px;
+    padding: 24px 8px 72px;
     gap: 24px;
   }
 }
