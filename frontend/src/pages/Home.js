@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+﻿import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../api"
 import CATEGORIES from "../data/categories"
@@ -60,23 +60,26 @@ export default function Home() {
           .map((match) => {
             const startAt = new Date(match.startAt)
             const timestamp = startAt.getTime()
-            const home = match.homeTeam?.name || match.homeTeam || "-"
-            const away = match.awayTeam?.name || match.awayTeam || "-"
-            const stadiumName = match.stadium?.stadiumName || match.stadiumName || ""
+            const homeTeam = match.homeTeam || {}
+            const awayTeam = match.awayTeam || {}
+            const home = homeTeam.name || homeTeam.teamName || homeTeam || "-"
+            const away = awayTeam.name || awayTeam.teamName || awayTeam || "-"
+            const stadiumData = match.stadium && typeof match.stadium === "object" ? match.stadium : null
+            const stadiumName = stadiumData?.stadiumName || match.stadiumName || ""
             const isValidStart = !Number.isNaN(timestamp)
             const diffHours = isValidStart ? (timestamp - now.getTime()) / (1000 * 60 * 60) : Infinity
 
             let statusTone = "normal"
-            let status = "보통"
+            let status = "진행"
             if (diffHours <= 4) {
               statusTone = "busy"
               status = "곧 시작"
             } else if (diffHours <= 24) {
               statusTone = "busy"
-              status = "혼잡 예상"
+              status = "오늘 경기"
             } else if (diffHours <= 72) {
               statusTone = "normal"
-              status = "준비하세요"
+              status = "이번 주"
             } else {
               statusTone = "free"
               status = "여유 있음"
@@ -85,8 +88,15 @@ export default function Home() {
             return {
               id: match._id || `${home}-${away}-${match.startAt}`,
               stadium: stadiumName,
-              matchLabel: `${home} vs ${away}`,
-              timeLabel: isValidStart ? startAt.toLocaleString() : "시간 미정",
+              home,
+              away,
+              homeLogo: homeTeam.logoImage || "",
+              awayLogo: awayTeam.logoImage || "",
+              stadiumData,
+              stadiumId: stadiumData?._id || match.stadium?._id || match.stadium,
+              timeLabel: isValidStart
+                ? startAt.toLocaleString('ko-KR', { hour12: false })
+                : '시간 미정',
               status,
               statusTone,
               startAt: isValidStart ? timestamp : null,
@@ -205,8 +215,8 @@ export default function Home() {
 
       <section className="section home-games-section">
         <div className="section__head">
-          <h2>이번 주 인기 경기</h2>
-          <span>혼잡 예상 시간과 함께 미리 체크하세요</span>
+          <h2>이번 주 경기</h2>
+          <span>다가오는 경기 일정과 혼잡도를 미리 확인하세요.</span>
         </div>
         {loadingHomeData ? (
           <div className="empty-state--subtle">경기 정보를 불러오는 중입니다…</div>
@@ -215,14 +225,45 @@ export default function Home() {
         ) : (
           <div className="match-list">
             {highlightMatches.map((game) => (
-              <article key={game.id} className="match-card">
+              <button
+                key={game.id}
+                type="button"
+                className="match-card"
+                onClick={() => {
+                  if (game.stadiumData?._id) {
+                    navigate(`/stadium/${game.stadiumData._id}`, { state: { stadium: game.stadiumData } })
+                  } else if (game.stadiumId) {
+                    navigate(`/stadium/${game.stadiumId}`)
+                  }
+                }}
+              >
                 <div className="match-card__body">
                   <span className="match-card__stadium">{game.stadium}</span>
-                  <strong className="match-card__match">{game.matchLabel}</strong>
+                  <div className="match-card__teams">
+                    <div className="match-card__team">
+                      {game.homeLogo ? (
+                        <img src={game.homeLogo} alt={`${game.home} 로고`} className="match-card__team-logo" />
+                      ) : (
+                        <span className="match-card__team-logo match-card__team-logo--placeholder">{game.home?.[0] || "H"}</span>
+                      )}
+                      <span>{game.home}</span>
+                    </div>
+                    <span aria-hidden="true" className="match-card__versus">
+                      vs
+                    </span>
+                    <div className="match-card__team">
+                      {game.awayLogo ? (
+                        <img src={game.awayLogo} alt={`${game.away} 로고`} className="match-card__team-logo" />
+                      ) : (
+                        <span className="match-card__team-logo match-card__team-logo--placeholder">{game.away?.[0] || "A"}</span>
+                      )}
+                      <span>{game.away}</span>
+                    </div>
+                  </div>
                   <span className="match-card__time">{game.timeLabel}</span>
                 </div>
                 <span className={`match-card__status match-card__status--${game.statusTone}`}>{game.status}</span>
-              </article>
+              </button>
             ))}
           </div>
         )}
@@ -230,3 +271,4 @@ export default function Home() {
     </div>
   )
 }
+

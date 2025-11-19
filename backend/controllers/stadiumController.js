@@ -1,7 +1,16 @@
 const path = require("path")
+const jwt = require("jsonwebtoken")
 const Stadium = require("../models/Stadium")
 const CommunityPost = require("../models/CommunityPost")
+const CommunityPostView = require("../models/CommunityPostView")
 const User = require("../models/User")
+
+const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret"
+const COMMUNITY_VIEW_COOLDOWN_MINUTES_RAW = Number(process.env.COMMUNITY_VIEW_COOLDOWN_MINUTES || 180)
+const COMMUNITY_VIEW_COOLDOWN_MS =
+  Number.isFinite(COMMUNITY_VIEW_COOLDOWN_MINUTES_RAW) && COMMUNITY_VIEW_COOLDOWN_MINUTES_RAW > 0
+    ? COMMUNITY_VIEW_COOLDOWN_MINUTES_RAW * 60 * 1000
+    : 0
 
 const toPlainObject = (value) => {
   if (!value) return value
@@ -16,6 +25,18 @@ const toIdString = (value) => {
   return String(value)
 }
 
+const normalizeReplies = (replies) =>
+  Array.isArray(replies)
+    ? replies.map((reply) => {
+        const plain = toPlainObject(reply) || {}
+        return {
+          ...plain,
+          _id: toIdString(plain._id) || plain._id,
+          authorId: toIdString(plain.authorId),
+        }
+      })
+    : []
+
 const normalizeComments = (comments) =>
   Array.isArray(comments)
     ? comments.map((comment) => {
@@ -24,6 +45,7 @@ const normalizeComments = (comments) =>
           ...plain,
           _id: toIdString(plain._id) || plain._id,
           authorId: toIdString(plain.authorId),
+          replies: normalizeReplies(plain.replies),
         }
       })
     : []
@@ -33,16 +55,18 @@ const resolveAuthorInfo = async (userPayload) => {
   if (!authorId) {
     return {
       authorId: null,
-      authorName: userPayload?.name || userPayload?.email || "익명",
+      authorName: userPayload?.nickname || userPayload?.name || userPayload?.email || "?듬챸",
     }
   }
-  const user = await User.findById(authorId).select("name email").lean()
+  const user = await User.findById(authorId).select("nickname name email").lean()
   const authorName =
+    (user?.nickname && user.nickname.trim()) ||
     (user?.name && user.name.trim()) ||
     (user?.email && user.email.split("@")[0]) ||
+    (userPayload?.nickname && userPayload.nickname.trim()) ||
     userPayload?.name ||
     userPayload?.email ||
-    "익명"
+    "?듬챸"
 
   return { authorId, authorName }
 }
@@ -71,6 +95,60 @@ const buildCommunityPostPayload = (post, currentUserId = null) => {
     recommendCount,
     recommended: normalizedCurrentUserId ? recommendedBy.includes(normalizedCurrentUserId) : false,
   }
+}
+
+const extractUserIdFromRequest = (req) => {
+  const token = req.headers["x-user-token"] || req.headers.authorization?.replace("Bearer ", "")
+  if (!token) return null
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    return toIdString(decoded?.id)
+  } catch (error) {
+    return null
+  }
+}
+
+const getClientIp = (req) => {
+  const forwarded = req.headers["x-forwarded-for"]
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim()
+  }
+  if (typeof req.headers["x-real-ip"] === "string" && req.headers["x-real-ip"].trim()) {
+    return req.headers["x-real-ip"].trim()
+  }
+  return req.ip || req.connection?.remoteAddress || null
+}
+
+const resolveViewerKey = (req) => {
+  const userId = extractUserIdFromRequest(req)
+  if (userId) return `user:${userId}`
+  const ip = getClientIp(req)
+  return ip ? `ip:${ip}` : null
+}
+
+const shouldCountCommunityView = async (postId, viewerKey) => {
+  if (!viewerKey) return true
+  const now = new Date()
+  const record = await CommunityPostView.findOne({ postId, viewerKey })
+  if (!record) {
+    try {
+      await CommunityPostView.create({ postId, viewerKey, lastViewedAt: now })
+      return true
+    } catch (error) {
+      if (error?.code === 11000) {
+        return false
+      }
+      throw error
+    }
+  }
+
+  const lastViewedAt = record.lastViewedAt ? new Date(record.lastViewedAt).getTime() : 0
+  if (!COMMUNITY_VIEW_COOLDOWN_MS || now.getTime() - lastViewedAt >= COMMUNITY_VIEW_COOLDOWN_MS) {
+    record.lastViewedAt = now
+    await record.save()
+    return true
+  }
+  return false
 }
 
 // GET /api/stadiums?category=baseball
@@ -184,13 +262,16 @@ exports.createCommunityPost = async (req, res) => {
 exports.getCommunityPost = async (req, res) => {
   try {
     const { id, postId } = req.params
-    const post = await CommunityPost.findOneAndUpdate(
-      { _id: postId, stadiumId: id },
-      { $inc: { views: 1 } },
-      { new: true },
-    )
+    const post = await CommunityPost.findOne({ _id: postId, stadiumId: id })
 
     if (!post) return res.status(404).json({ message: "Post not found" })
+
+    const viewerKey = resolveViewerKey(req)
+    const canIncrease = await shouldCountCommunityView(post._id, viewerKey)
+    if (canIncrease) {
+      post.views = (post.views || 0) + 1
+      await post.save()
+    }
 
     res.json(buildCommunityPostPayload(post))
   } catch (error) {
@@ -227,6 +308,38 @@ exports.addCommunityComment = async (req, res) => {
   }
 }
 
+exports.addCommunityReply = async (req, res) => {
+  try {
+    const { id, postId, commentId } = req.params
+    const { message } = req.body
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ message: "답글 내용을 입력해 주세요." })
+    }
+
+    const post = await CommunityPost.findOne({ _id: postId, stadiumId: id })
+    if (!post) return res.status(404).json({ message: "Post not found" })
+
+    const comment = post.comments.id(commentId)
+    if (!comment) return res.status(404).json({ message: "Comment not found" })
+
+    const { authorId, authorName } = await resolveAuthorInfo(req.user)
+
+    comment.replies = Array.isArray(comment.replies) ? comment.replies : []
+    comment.replies.push({
+      authorId,
+      authorName,
+      message: message.trim(),
+    })
+    await post.save()
+
+    res.status(201).json(buildCommunityPostPayload(post, authorId))
+  } catch (error) {
+    console.error("addCommunityReply error", error)
+    res.status(500).json({ message: "Server Error" })
+  }
+}
+
 exports.toggleRecommendCommunityPost = async (req, res) => {
   try {
     const { id, postId } = req.params
@@ -252,6 +365,89 @@ exports.toggleRecommendCommunityPost = async (req, res) => {
     res.json(buildCommunityPostPayload(post, userId))
   } catch (error) {
     console.error("toggleRecommendCommunityPost error", error)
+    res.status(500).json({ message: "Server Error" })
+  }
+}
+
+exports.deleteCommunityPost = async (req, res) => {
+  try {
+    const { id, postId } = req.params
+    const userId = toIdString(req.user?.id)
+    if (!userId) return res.status(401).json({ message: "삭제 권한이 없습니다." })
+
+    const post = await CommunityPost.findOne({ _id: postId, stadiumId: id })
+    if (!post) return res.status(404).json({ message: "Post not found" })
+
+    if (toIdString(post.authorId) !== userId) {
+      return res.status(403).json({ message: "본인이 작성한 글만 삭제할 수 있습니다." })
+    }
+
+    await CommunityPost.deleteOne({ _id: post._id })
+    await CommunityPostView.deleteMany({ postId: post._id }).catch(() => {})
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error("deleteCommunityPost error", error)
+    res.status(500).json({ message: "Server Error" })
+  }
+}
+
+exports.adminListCommunityPosts = async (req, res) => {
+  try {
+    const { stadiumId, q, page = 1, limit = 50 } = req.query
+    const numericLimit = Math.min(Math.max(Number(limit) || 50, 1), 200)
+    const numericPage = Math.max(Number(page) || 1, 1)
+    const filter = {}
+
+    if (stadiumId) filter.stadiumId = stadiumId
+    if (q && q.trim()) {
+      const regex = new RegExp(q.trim(), "i")
+      filter.$or = [{ title: regex }, { message: regex }, { authorName: regex }]
+    }
+
+    const [items, total] = await Promise.all([
+      CommunityPost.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((numericPage - 1) * numericLimit)
+        .limit(numericLimit)
+        .populate({ path: "stadiumId", select: "stadiumName" })
+        .lean(),
+      CommunityPost.countDocuments(filter),
+    ])
+
+    res.json({
+      items: items.map((post) => ({
+        _id: post._id,
+        title: post.title,
+        authorName: post.authorName,
+        stadiumId: post.stadiumId?._id?.toString?.() || post.stadiumId?.toString?.() || "",
+        stadiumName: post.stadiumId?.stadiumName || "",
+        views: post.views || 0,
+        recommendCount: post.recommendCount || 0,
+        createdAt: post.createdAt,
+      })),
+      total,
+      page: numericPage,
+      limit: numericLimit,
+    })
+  } catch (error) {
+    console.error("adminListCommunityPosts error", error)
+    res.status(500).json({ message: "Server Error" })
+  }
+}
+
+exports.adminDeleteCommunityPost = async (req, res) => {
+  try {
+    const { postId } = req.params
+    const post = await CommunityPost.findById(postId)
+    if (!post) return res.status(404).json({ message: "Post not found" })
+
+    await CommunityPost.deleteOne({ _id: post._id })
+    await CommunityPostView.deleteMany({ postId: post._id }).catch(() => {})
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error("adminDeleteCommunityPost error", error)
     res.status(500).json({ message: "Server Error" })
   }
 }

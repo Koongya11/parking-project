@@ -1,14 +1,18 @@
 import React, { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate, useLocation, Link } from "react-router-dom"
 import api from "../../api"
 import { useAuth } from "../../context/AuthContext"
+import GoogleAuthButton from "../../components/auth/GoogleAuthButton"
 
 export default function UserLogin() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
+  const redirectTo = location.state?.from || "/"
+  const hasGoogleLogin = Boolean((process.env.REACT_APP_GOOGLE_CLIENT_ID || "").trim())
 
   const submit = async (event) => {
     event.preventDefault()
@@ -20,7 +24,7 @@ export default function UserLogin() {
     try {
       const { data } = await api.post("/auth/login", { email, password })
       login(data.token)
-      navigate("/", { replace: true })
+      navigate(redirectTo, { replace: true })
     } catch (err) {
       console.error("login failed", err)
       const message = err?.response?.data?.message || "로그인에 실패했습니다."
@@ -57,6 +61,15 @@ export default function UserLogin() {
             {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
+
+        {hasGoogleLogin && (
+          <>
+            <div className="auth-divider">
+              <span>또는</span>
+            </div>
+            <GoogleAuthButton buttonText="구글 계정으로 계속하기" />
+          </>
+        )}
 
         <p className="auth-card__footer">
           아직 계정이 없으신가요? <Link to="/register">회원가입</Link>

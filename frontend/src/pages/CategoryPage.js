@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+﻿import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import api from "../api"
 import CATEGORIES from "../data/categories"
@@ -41,17 +41,28 @@ export default function CategoryPage() {
       matches.map((match) => {
         const startAt = new Date(match.startAt)
         const formatted = Number.isNaN(startAt.getTime())
-          ? "일정 미정"
-          : startAt.toLocaleString()
-        const home = match.homeTeam?.name || match.homeTeam || "-"
-        const away = match.awayTeam?.name || match.awayTeam || "-"
+          ? "시간 미정"
+          : startAt.toLocaleString("ko-KR", { hour12: false })
+        const homeTeam = match.homeTeam || {}
+        const awayTeam = match.awayTeam || {}
+        const home = homeTeam.name || homeTeam.teamName || homeTeam || "-"
+        const away = awayTeam.name || awayTeam.teamName || awayTeam || "-"
+        const stadiumObj =
+          match.stadium && typeof match.stadium === "object" ? match.stadium : null
         const stadiumName =
-          match.stadium?.stadiumName ||
-          match.stadiumName ||
-          match.stadium ||
-          ""
+          stadiumObj?.stadiumName || match.stadiumName || match.stadium || ""
         const key = match._id || `${home}-${away}-${match.startAt}`
-        return { key, formatted, home, away, stadiumName }
+        return {
+          key,
+          formatted,
+          home,
+          away,
+          homeLogo: homeTeam.logoImage || "",
+          awayLogo: awayTeam.logoImage || "",
+          stadiumName,
+          stadiumObj,
+          stadiumId: stadiumObj?._id || match.stadium?._id || match.stadium,
+        }
       }),
     [matches]
   )
@@ -101,25 +112,57 @@ export default function CategoryPage() {
           </div>
           <ul className="category-page__match-list">
             {matchItems.map((item) => (
-              <li key={item.key} className="category-page__match-card">
-                <div className="category-page__match-time">{item.formatted}</div>
-                <div className="category-page__match-teams">
-                  <span>{item.home}</span>
-                  <span aria-hidden="true">vs</span>
-                  <span>{item.away}</span>
-                </div>
-                {item.stadiumName && (
-                  <div className="category-page__match-stadium">
-                    {item.stadiumName}
+              <li key={item.key}>
+                <button
+                  type="button"
+                  className="category-page__match-card"
+                  onClick={() => {
+                    if (item.stadiumObj?._id) {
+                      navigate(`/stadium/${item.stadiumObj._id}`, {
+                        state: { stadium: item.stadiumObj },
+                      })
+                    } else if (item.stadiumId) {
+                      navigate(`/stadium/${item.stadiumId}`)
+                    }
+                  }}
+                >
+                  <div className="category-page__match-time">{item.formatted}</div>
+                  <div className="category-page__match-teams">
+                    <div className="category-page__match-team">
+                      {item.homeLogo ? (
+                        <img src={item.homeLogo} alt={`${item.home} 로고`} className="category-page__match-logo" />
+                      ) : (
+                        <span className="category-page__match-logo category-page__match-logo--placeholder">
+                          {item.home?.[0] || 'H'}
+                        </span>
+                      )}
+                      <span>{item.home}</span>
+                    </div>
+                    <span aria-hidden="true" className="category-page__match-versus">
+                      vs
+                    </span>
+                    <div className="category-page__match-team">
+                      {item.awayLogo ? (
+                        <img src={item.awayLogo} alt={`${item.away} 로고`} className="category-page__match-logo" />
+                      ) : (
+                        <span className="category-page__match-logo category-page__match-logo--placeholder">
+                          {item.away?.[0] || 'A'}
+                        </span>
+                      )}
+                      <span>{item.away}</span>
+                    </div>
                   </div>
-                )}
+                  {item.stadiumName && (
+                    <div className="category-page__match-stadium">{item.stadiumName}</div>
+                  )}
+                </button>
               </li>
             ))}
           </ul>
-        </section>
-      )}
+          </section>
+        )}
 
-      <section className="category-page__section">
+        <section className="category-page__section">
         <div className="category-page__section-head">
           <h2>경기장 주차 정보</h2>
           {stadiums.length > 0 && (
@@ -175,3 +218,5 @@ export default function CategoryPage() {
     </div>
   )
 }
+
+

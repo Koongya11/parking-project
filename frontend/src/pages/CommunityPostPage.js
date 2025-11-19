@@ -35,6 +35,7 @@ export default function CommunityPostPage() {
   const [commentError, setCommentError] = useState("")
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [recommendSubmitting, setRecommendSubmitting] = useState(false)
+  const [replyForms, setReplyForms] = useState({})
 
   const backendOrigin = useMemo(resolveBackendOrigin, [])
   const resolveImageUrl = useCallback(
@@ -74,12 +75,12 @@ export default function CommunityPostPage() {
         if (data && data._id) {
           setPost(data)
         } else {
-          setError("게시글을 찾을 수 없습니다.")
+          setError("게시글 정보를 찾을 수 없습니다.")
         }
       })
       .catch(() => {
         if (cancelled) return
-        setError("게시글을 불러오지 못했습니다.")
+        setError("게시글을 불러오는 데 실패했습니다.")
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -96,6 +97,10 @@ export default function CommunityPostPage() {
   }, [user])
 
   const hasRecommended = post && user?.id ? (post.recommendedBy || []).includes(user.id) : false
+
+  useEffect(() => {
+    setReplyForms({})
+  }, [post?._id])
 
   const goBackToCommunity = () => {
     navigate(`/stadium/${id}`, { state: { stadium, activeTab: "community" } })
@@ -159,6 +164,75 @@ export default function CommunityPostPage() {
     }
   }
 
+  const toggleReplyForm = (commentId) => {
+    setReplyForms((prev) => {
+      const current = prev[commentId] || { open: false, message: "" }
+      return { ...prev, [commentId]: { ...current, open: !current.open } }
+    })
+  }
+
+  const handleReplyChange = (commentId, value) => {
+    setReplyForms((prev) => ({
+      ...prev,
+      [commentId]: { ...prev[commentId], message: value },
+    }))
+  }
+
+  const handleReplySubmit = async (commentId, event) => {
+    event.preventDefault()
+    if (!post?._id) return
+    if (!isLoggedIn) {
+      alert("답글을 남기려면 로그인해 주세요.")
+      return
+    }
+    const value = replyForms[commentId]?.message || ""
+    if (!value.trim()) {
+      alert("답글 내용을 입력해 주세요.")
+      return
+    }
+    setReplyForms((prev) => ({
+      ...prev,
+      [commentId]: { ...(prev[commentId] || {}), submitting: true },
+    }))
+    try {
+      const { data } = await api.post(
+        `/stadiums/${id}/community/${post._id}/comments/${commentId}/replies`,
+        { message: value.trim(), nickname: resolveUserNickname() },
+      )
+      if (data && data._id) {
+        setPost(data)
+        setReplyForms((prev) => ({
+          ...prev,
+          [commentId]: { open: false, message: "", submitting: false },
+        }))
+      }
+    } catch (error) {
+      console.error("reply submit failed", error)
+      const message = error?.response?.data?.message || "답글 등록에 실패했습니다."
+      alert(message)
+      setReplyForms((prev) => ({
+        ...prev,
+        [commentId]: { ...(prev[commentId] || {}), submitting: false },
+      }))
+    }
+  }
+
+  const formatDate = (value) => {
+    if (!value) return "-"
+    try {
+      return new Date(value).toLocaleString("ko-KR", {
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    } catch {
+      return "-"
+    }
+  }
+
   return (
     <div className="page">
       <div className="page-hero community-post-hero">
@@ -183,20 +257,26 @@ export default function CommunityPostPage() {
         <article className="community-detail">
           <header className="community-detail__head">
             <div>
-              <h2>{post.title}</h2>
+              <h2>
+                {post.title}
+                <span className="community-detail__date">{formatDate(post.createdAt)}</span>
+              </h2>
               <div className="community-meta">
                 <span>작성자 {post.authorName || "익명"}</span>
-                <span>{post.createdAt ? new Date(post.createdAt).toLocaleString() : "-"}</span>
-                <span>조회 {post.views ?? 0}</span>
-                <span>댓글 {post.commentCount ?? 0}</span>
+                <span>조회 👁 {post.views ?? 0}</span>
+                <span>댓글 💬 {post.commentCount ?? 0}</span>
               </div>
             </div>
-            <button type="button" className="pill-button" onClick={handleRecommend} disabled={recommendSubmitting}>
-              {hasRecommended ? "추천 취소" : "추천"} {post.recommendCount ?? 0}
-            </button>
           </header>
 
           <p className="community-detail__body">{post.message}</p>
+
+          <div className="community-recommend">
+            <button type="button" className={`pill-button ${hasRecommended ? "is-active" : ""}`} onClick={handleRecommend} disabled={recommendSubmitting}>
+              {hasRecommended ? "추천 취소" : "추천"}
+            </button>
+            <span className="community-recommend__count">👍 {post.recommendCount ?? 0}</span>
+          </div>
 
           {Array.isArray(post.images) && post.images.length > 0 && (
             <div className="community-detail__images">
@@ -214,9 +294,41 @@ export default function CommunityPostPage() {
                   <div key={comment._id || comment.createdAt} className="community-comment">
                     <div className="community-comment__meta">
                       <span className="author">{comment.authorName || "익명"}</span>
-                      <span className="date">{comment.createdAt ? new Date(comment.createdAt).toLocaleString() : "-"}</span>
+                      <span className="date">{formatDate(comment.createdAt)}</span>
+                      <button type="button" className="community-reply-toggle" onClick={() => toggleReplyForm(comment._id)}>
+                        {replyForms[comment._id]?.open ? "답글 닫기" : "답글"}
+                      </button>
                     </div>
                     <p className="community-comment__body">{comment.message}</p>
+                    {Array.isArray(comment.replies) && comment.replies.length > 0 && (
+                      <div className="community-replies">
+                        {comment.replies.map((reply) => (
+                          <div key={reply._id || reply.createdAt} className="community-reply">
+                            <div className="community-comment__meta">
+                              <span className="author">{reply.authorName || "익명"}</span>
+                              <span className="date">{formatDate(reply.createdAt)}</span>
+                            </div>
+                            <p className="community-comment__body">{reply.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {replyForms[comment._id]?.open && (
+                      <form className="community-reply-form" onSubmit={(event) => handleReplySubmit(comment._id, event)}>
+                        <textarea
+                          rows={3}
+                          value={replyForms[comment._id]?.message || ""}
+                          onChange={(event) => handleReplyChange(comment._id, event.target.value)}
+                          placeholder="답글을 입력해 주세요."
+                          disabled={replyForms[comment._id]?.submitting}
+                        />
+                        <div className="community-comment__actions">
+                          <button type="submit" className="cta-button" disabled={replyForms[comment._id]?.submitting}>
+                            {replyForms[comment._id]?.submitting ? "등록 중..." : "답글 등록"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 ))}
               </div>
@@ -230,7 +342,7 @@ export default function CommunityPostPage() {
                   value={commentForm.message}
                   onChange={(event) => setCommentForm({ message: event.target.value })}
                   placeholder="댓글을 입력해 주세요."
-                  rows={3}
+                  rows={4}
                   disabled={commentSubmitting}
                 />
               </div>
@@ -247,4 +359,3 @@ export default function CommunityPostPage() {
     </div>
   )
 }
-

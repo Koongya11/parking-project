@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Map, Polygon, DrawingManager, Toolbox, MapMarker, Polyline } from "react-kakao-maps-sdk"
+import { Map, Polygon, DrawingManager, MapMarker, Polyline, CustomOverlayMap } from "react-kakao-maps-sdk"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import api from "../api"
 import "../App.css"
@@ -66,10 +66,31 @@ const formatDuration = (duration) => {
   return `${hours}시간 ${remain}분`
 }
 
+const getUserDisplayName = (user) => {
+  if (!user) return "익명"
+  if (typeof user.nickname === "string" && user.nickname.trim()) return user.nickname.trim()
+  if (typeof user.name === "string" && user.name.trim()) return user.name.trim()
+  if (typeof user.email === "string" && user.email.includes("@")) return user.email.split("@")[0]
+  return "익명"
+}
+
+const getAreaCreatorName = (area) => {
+  if (!area) return "제보자"
+  if (typeof area.createdByName === "string" && area.createdByName.trim()) return area.createdByName.trim()
+  const creator = area.createdBy
+  if (creator) {
+    if (typeof creator === "string") return creator
+    if (typeof creator.nickname === "string" && creator.nickname.trim()) return creator.nickname.trim()
+    if (typeof creator.name === "string" && creator.name.trim()) return creator.name.trim()
+    if (typeof creator.email === "string" && creator.email.includes("@")) return creator.email.split("@")[0]
+  }
+  return "제보자"
+}
+
 export default function MapPage() {
   const navigate = useNavigate()
   const { user, isLoggedIn, refreshUser } = useAuth()
-  const [search] = useSearchParams()
+  const [search, setSearch] = useSearchParams()
   const location = useLocation()
 
   const initialLat = toNumber(search.get("lat"))
@@ -101,8 +122,26 @@ export default function MapPage() {
   const previousFullScreenRef = useRef(false)
   const lastRouteKeyRef = useRef("")
   const initialAreaHandledRef = useRef(false)
-
+  const locationWatchId = useRef(null)
+  const [userHeading, setUserHeading] = useState(0)
   const [isFullScreen, setIsFullScreen] = useState(() => Boolean(stadiumName) || isDrawMode)
+
+  const exitDrawMode = useCallback(() => {
+    const next = new URLSearchParams(search)
+    next.delete("draw")
+    setSearch(next, { replace: true })
+  }, [search, setSearch])
+
+  const startDrawing = useCallback(() => {
+    if (!drawingManager || !window.kakao?.maps?.drawing) return
+    drawingManager.select(window.kakao.maps.drawing.OverlayType.POLYGON)
+  }, [drawingManager])
+
+  const cancelDrawingMode = useCallback(() => {
+    drawingManager?.cancel?.()
+    drawingManager?.clear?.()
+    exitDrawMode()
+  }, [drawingManager, exitDrawMode])
 
   const selectedArea = useMemo(
     () => parkingAreas.find((area) => area._id === selectedAreaId) || null,
@@ -200,6 +239,9 @@ export default function MapPage() {
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude }
         setMyLocation(newPos)
+        if (typeof position.coords.heading === "number" && !Number.isNaN(position.coords.heading)) {
+          setUserHeading(position.coords.heading)
+        }
         if (followUser && !selectedAreaId) {
           setMapCenter(newPos)
         }
@@ -209,6 +251,41 @@ export default function MapPage() {
       },
     )
   }, [followUser, selectedAreaId])
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return undefined
+
+    if (isGuiding || followUser) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const newPos = { lat: position.coords.latitude, lng: position.coords.longitude }
+          setMyLocation(newPos)
+          if (typeof position.coords.heading === "number" && !Number.isNaN(position.coords.heading)) {
+            setUserHeading(position.coords.heading)
+          }
+          if (isGuiding || followUser) {
+            setMapCenter(newPos)
+          }
+        },
+        (error) => {
+          console.error("geolocation watch error", error)
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
+      )
+      locationWatchId.current = watchId
+      return () => {
+        navigator.geolocation.clearWatch(watchId)
+        locationWatchId.current = null
+      }
+    }
+
+    if (locationWatchId.current !== null) {
+      navigator.geolocation.clearWatch(locationWatchId.current)
+      locationWatchId.current = null
+    }
+
+    return undefined
+  }, [isGuiding, followUser])
 
   useEffect(() => {
     setSelectedAreaId("")
@@ -455,6 +532,7 @@ export default function MapPage() {
         stadiumName: stadiumName || "미확인",
         title,
         polygon: { type: "Polygon", coordinates: [newPolygonCoordinates] },
+        createdByName: getUserDisplayName(user),
       }
 
       setParkingAreas((prev) => [...prev, newArea])
@@ -496,7 +574,18 @@ export default function MapPage() {
 
       <div className={`map-container ${isFullScreen ? "fullscreen" : ""}`}>
         <Map center={mapCenter} style={{ width: "100%", height: "100%" }} level={4}>
-          {myLocation && <MapMarker position={myLocation} />}
+          {myLocation && !isGuiding && <MapMarker position={myLocation} />}
+          {myLocation && isGuiding && (
+            <CustomOverlayMap position={myLocation}>
+              <div className="user-heading-marker">
+                <div className="user-heading-marker__dot" />
+                <div
+                  className="user-heading-marker__arrow"
+                  style={{ transform: `rotate(${userHeading || 0}deg)` }}
+                />
+              </div>
+            </CustomOverlayMap>
+          )}
           {selectedPos && <MapMarker position={selectedPos} />}
 
           {parkingAreas.map((area) => {
@@ -539,7 +628,6 @@ export default function MapPage() {
                 setDrawingManager(manager)
               }}
             >
-              <Toolbox />
             </DrawingManager>
           )}
         </Map>
@@ -573,6 +661,9 @@ export default function MapPage() {
             <div>
               <h2>{selectedArea.title}</h2>
               <p>{selectedArea.stadiumName || "경기장 정보가 없습니다."}</p>
+              <p style={{ marginTop: 4, color: "#475569", fontSize: 14 }}>
+                제보자 {getAreaCreatorName(selectedArea)}
+              </p>
               {averageCongestion !== null && (
                 <p style={{ marginTop: 6, color: "#475569" }}>
                   최근 혼잡도 평균 {averageCongestion.toFixed(1)} / 5
@@ -622,10 +713,10 @@ export default function MapPage() {
         <div className="feedback-overlay">
           <div className="feedback-card">
             <h2>혼잡도 평가</h2>
-            <p>0(한산)부터 5(매우 혼잡)까지 0.5 단위로 평가해주세요.</p>
+            <p>슬라이드를 움직여 현재 혼잡도를 알려주세요. 수치는 0.5 단위로 조정됩니다.</p>
             <div className="feedback-slider">
               <div className="feedback-slider__scale">
-                <span>0</span>
+                <span className="feedback-slider__label feedback-slider__label--low">여유</span>
                 <input
                   type="range"
                   min="0"
@@ -633,8 +724,9 @@ export default function MapPage() {
                   step="0.5"
                   value={congestionScore}
                   onChange={(e) => setCongestionScore(parseFloat(e.target.value))}
+                  className="feedback-slider__input"
                 />
-                <span>5</span>
+                <span className="feedback-slider__label feedback-slider__label--high">혼잡</span>
               </div>
               <div className="feedback-score-display">{congestionScore.toFixed(1)} / 5</div>
             </div>
@@ -649,29 +741,21 @@ export default function MapPage() {
       )}
 
       {isFullScreen && isDrawMode && drawingManager && (
-        <div
-          style={{
-            position: "fixed",
-            top: 16,
-            right: 16,
-            zIndex: 2147483647,
-            background: "rgba(255,255,255,.95)",
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: "8px 10px",
-            display: "flex",
-            gap: 8,
-            boxShadow: "0 8px 24px rgba(0,0,0,.15)",
-            pointerEvents: "auto",
-          }}
-        >
-          <button onClick={() => drawingManager.select(window.kakao.maps.drawing.OverlayType.POLYGON)}>
-            다각형
+        <div className="draw-manager-controls">
+          <button type="button" className="cta-button" onClick={startDrawing}>
+            추가
           </button>
-          <button onClick={() => drawingManager.cancel()}>취소</button>
-          <button onClick={() => drawingManager.clear()}>초기화</button>
+          <button type="button" onClick={cancelDrawingMode}>
+            취소
+          </button>
         </div>
       )}
     </div>
   )
 }
+
+
+
+
+
+

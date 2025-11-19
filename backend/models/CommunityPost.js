@@ -1,10 +1,22 @@
 const mongoose = require("mongoose")
 
+const communityReplySchema = new mongoose.Schema(
+  {
+    authorId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    authorName: { type: String, required: true, trim: true },
+    message: { type: String, required: true, trim: true },
+  },
+  {
+    timestamps: true,
+  },
+)
+
 const communityCommentSchema = new mongoose.Schema(
   {
     authorId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     authorName: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
+    replies: [communityReplySchema],
   },
   {
     timestamps: true,

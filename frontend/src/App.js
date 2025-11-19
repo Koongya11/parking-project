@@ -13,6 +13,7 @@ import AdminHome from "./pages/admin/AdminHome"
 import AdminTeams from "./pages/admin/AdminTeams"
 import AdminMatches from "./pages/admin/AdminMatches"
 import AdminParkingAreas from "./pages/admin/AdminParkingAreas"
+import AdminCommunity from "./pages/admin/AdminCommunity"
 import UserLogin from "./pages/auth/UserLogin"
 import UserRegister from "./pages/auth/UserRegister"
 import AppLayout from "./components/AppLayout"
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/admin/teams" element={<AdminTeams />} />
           <Route path="/admin/matches" element={<AdminMatches />} />
           <Route path="/admin/parking-areas" element={<AdminParkingAreas />} />
+          <Route path="/admin/community" element={<AdminCommunity />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
       </AuthProvider>

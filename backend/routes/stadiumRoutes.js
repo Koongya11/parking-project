@@ -11,7 +11,9 @@ const {
   createCommunityPost,
   getCommunityPost,
   addCommunityComment,
+  addCommunityReply,
   toggleRecommendCommunityPost,
+  deleteCommunityPost,
 } = require("../controllers/stadiumController")
 const adminAuth = require("../middleware/adminAuth")
 const userAuth = require("../middleware/userAuth")
@@ -46,6 +48,8 @@ router.get("/:id/community", listCommunityPosts)
 router.get("/:id/community/:postId", getCommunityPost)
 router.post("/:id/community", userAuth, communityImageUpload.array("images", 5), createCommunityPost)
 router.post("/:id/community/:postId/comments", userAuth, addCommunityComment)
+router.post("/:id/community/:postId/comments/:commentId/replies", userAuth, addCommunityReply)
 router.post("/:id/community/:postId/recommend", userAuth, toggleRecommendCommunityPost)
+router.delete("/:id/community/:postId", userAuth, deleteCommunityPost)
 
 module.exports = router

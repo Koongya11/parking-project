@@ -28,6 +28,8 @@ const parkingAreaSchema = new mongoose.Schema({
   category: { type: String, required: true },
   stadiumName: { type: String, required: true },
   title: { type: String, required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  createdByName: { type: String, trim: true },
   polygon: {
     type: polygonSchema,
     required: true,

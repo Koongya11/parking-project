@@ -21,6 +21,35 @@ const getAreaCentroid = (area) => {
   return { lng: sumLng / ring.length, lat: sumLat / ring.length }
 }
 
+const getAreaCreatorName = (area) => {
+  if (!area) return "제보자"
+  if (typeof area.createdByName === "string" && area.createdByName.trim()) return area.createdByName.trim()
+  const creator = area.createdBy
+  if (creator) {
+    if (typeof creator === "string") return creator
+    if (typeof creator.nickname === "string" && creator.nickname.trim()) return creator.nickname.trim()
+    if (typeof creator.name === "string" && creator.name.trim()) return creator.name.trim()
+    if (typeof creator.email === "string" && creator.email.includes("@")) return creator.email.split("@")[0]
+  }
+  return "제보자"
+}
+
+const formatDateTime = (value) => {
+  if (!value) return "-"
+  try {
+    return new Date(value).toLocaleString("ko-KR", {
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch {
+    return "-"
+  }
+}
+
 export default function StadiumPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -274,6 +303,10 @@ export default function StadiumPage() {
                       <div className="list-card__meta">
                         혼잡도 {avg !== null ? `${avg.toFixed(1)} / 5` : "데이터 없음"} · 즐겨찾기 {saves}회
                       </div>
+                    
+                      <div class="list-card__meta" style={{ color: "#64748b" }}>
+                        제보자 {getAreaCreatorName(area)}
+                      </div>
                     </button>
                   )
                 })}
@@ -375,30 +408,32 @@ export default function StadiumPage() {
             <div className="empty-state">아직 글이 없습니다. 첫 번째 후기를 남겨 보세요!</div>
           ) : (
             <div className="community-board">
-              <div className="community-board__header">
-                <span className="col-title">제목</span>
-                <span className="col-author">작성자</span>
-                <span className="col-date">등록일</span>
-                <span className="col-views">조회</span>
-                <span className="col-recommends">추천</span>
-              </div>
               <div className="community-board__body">
-                {communityPosts.map((post) => (
-                  <button
-                    key={post._id}
-                    type="button"
-                    className="community-board__row"
-                    onClick={() => openCommunityPost(post)}
-                  >
-                    <span className="col-title">{post.title}</span>
-                    <span className="col-author">{post.authorName || "익명"}</span>
-                    <span className="col-date">
-                      {post.createdAt ? new Date(post.createdAt).toLocaleString() : "-"}
-                    </span>
-                    <span className="col-views">{post.views ?? 0}</span>
-                    <span className="col-recommends">{post.recommendCount ?? 0}</span>
-                  </button>
-                ))}
+                {communityPosts.map((post) => {
+                  const createdAtText = formatDateTime(post.createdAt)
+                  const views = post.views ?? 0
+                  const recommends = post.recommendCount ?? 0
+                  return (
+                    <button
+                      key={post._id}
+                      type="button"
+                      className="community-board__row"
+                      onClick={() => openCommunityPost(post)}
+                    >
+                      <div className="community-board__title">{post.title}</div>
+                      <div className="community-board__meta">
+                        <span>{createdAtText}</span>
+                        <span>{post.authorName || "익명"}</span>
+                        <span className="community-board__meta-icon" aria-label="조회수">
+                          👁 {views}
+                        </span>
+                        <span className="community-board__meta-icon" aria-label="추천수">
+                          👍 {recommends}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}

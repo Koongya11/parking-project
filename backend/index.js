@@ -10,6 +10,7 @@ const parkingAreaRoutes = require('./routes/parkingAreaRoutes')
 const authRoutes = require('./routes/authRoutes')
 const navigationRoutes = require('./routes/navigationRoutes')
 const userRoutes = require('./routes/userRoutes')
+const adminCommunityRoutes = require('./routes/adminCommunityRoutes')
 
 connectDB()
 
@@ -31,6 +32,7 @@ app.use('/api/teams', teamRoutes)
 app.use('/api/matches', matchRoutes)
 app.use('/api/navigation', navigationRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/admin/community-posts', adminCommunityRoutes)
 
 app.listen(port, () => {
   console.log(`Backend server running at http://localhost:${port}`)
