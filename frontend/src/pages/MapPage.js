@@ -100,6 +100,7 @@ export default function MapPage() {
   const followUser = search.get("follow") !== "0"
   const areaIdFromQuery = search.get("areaId") || ""
   const stadiumName = search.get("stadium") || ""
+  const stadiumId = search.get("stadiumId") || ""
   const isDrawMode = search.get("draw") === "1"
 
   const [mapCenter, setMapCenter] = useState(initialCenter)
@@ -113,7 +114,13 @@ export default function MapPage() {
   const [isGuiding, setIsGuiding] = useState(false)
   const [showFeedbackForm, setShowFeedbackForm] = useState(false)
   const [congestionScore, setCongestionScore] = useState(2.5)
+  const [areaNamingModal, setAreaNamingModal] = useState({ open: false, polygon: null, manager: null })
+  const [areaNameInput, setAreaNameInput] = useState("")
+  const [areaNamingError, setAreaNamingError] = useState("")
+  const [areaNamingSubmitting, setAreaNamingSubmitting] = useState(false)
+  const [areaSavingStatus, setAreaSavingStatus] = useState({ message: "", type: "" })
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+  const [feedbackNotice, setFeedbackNotice] = useState(null)
   const [saveLoading, setSaveLoading] = useState(false)
   const [pendingSaveAction, setPendingSaveAction] = useState(null)
 
@@ -125,6 +132,20 @@ export default function MapPage() {
   const locationWatchId = useRef(null)
   const [userHeading, setUserHeading] = useState(0)
   const [isFullScreen, setIsFullScreen] = useState(() => Boolean(stadiumName) || isDrawMode)
+
+  useEffect(() => {
+    if (!showFeedbackForm) {
+      setFeedbackNotice(null)
+    }
+  }, [showFeedbackForm])
+
+  useEffect(() => {
+    if (!areaSavingStatus.message) return
+    const timer = setTimeout(() => {
+      setAreaSavingStatus({ message: "", type: "" })
+    }, 2800)
+    return () => clearTimeout(timer)
+  }, [areaSavingStatus])
 
   const exitDrawMode = useCallback(() => {
     const next = new URLSearchParams(search)
@@ -142,6 +163,84 @@ export default function MapPage() {
     drawingManager?.clear?.()
     exitDrawMode()
   }, [drawingManager, exitDrawMode])
+
+  const closeAreaNamingFlow = useCallback(() => {
+    setAreaNamingModal({ open: false, polygon: null, manager: null })
+    setAreaNameInput("")
+    setAreaNamingError("")
+  }, [])
+
+  const clearDrawingOverlay = useCallback(() => {
+    const manager = areaNamingModal.manager || drawingManager
+    manager?.clear()
+    manager?.cancel?.()
+  }, [areaNamingModal.manager, drawingManager])
+
+  const handleCancelAreaNaming = useCallback(() => {
+    clearDrawingOverlay()
+    closeAreaNamingFlow()
+  }, [clearDrawingOverlay, closeAreaNamingFlow])
+
+  const handleAreaNamingSubmit = useCallback(async () => {
+    if (!areaNamingModal.polygon) {
+      setAreaNamingError("영역 정보를 찾지 못했습니다.")
+      return
+    }
+    const name = areaNameInput.trim()
+    if (!name) {
+      setAreaNamingError("주차 구역 이름을 입력해주세요.")
+      return
+    }
+
+    setAreaNamingError("")
+    savingRef.current = true
+    setAreaNamingSubmitting(true)
+
+    const manager = areaNamingModal.manager || drawingManager
+    const newArea = {
+      _id: Date.now().toString(),
+      category: search.get("category") || "UNKNOWN",
+      stadiumName: stadiumName || "미확인",
+      title: name,
+      polygon: { type: "Polygon", coordinates: [areaNamingModal.polygon] },
+      createdByName: getUserDisplayName(user),
+    }
+    if (stadiumId) {
+      newArea.stadiumId = stadiumId
+    }
+
+    setParkingAreas((prev) => [...prev, newArea])
+    closeAreaNamingFlow()
+
+    const headers = { "x-user-token": localStorage.getItem("USER_TOKEN") || "" }
+    try {
+      const { data } = await api.post("/parking-areas", newArea, { headers })
+      const storedArea = data?.area ?? data
+      if (storedArea && storedArea._id) {
+        setParkingAreas((prev) => prev.map((area) => (area._id === newArea._id ? storedArea : area)))
+      }
+      setAreaSavingStatus({ message: "새 주차 구역이 등록되었습니다.", type: "success" })
+    } catch (error) {
+      console.error("Failed to create parking area:", error)
+      const message = error?.response?.data?.message || "등록에 실패했습니다. 잠시 후 다시 시도해주세요."
+      setAreaSavingStatus({ message, type: "error" })
+      setParkingAreas((prev) => prev.filter((area) => area._id !== newArea._id))
+    } finally {
+      clearDrawingOverlay()
+      savingRef.current = false
+      setAreaNamingSubmitting(false)
+    }
+  }, [
+    areaNameInput,
+    areaNamingModal,
+    drawingManager,
+    search,
+    stadiumId,
+    stadiumName,
+    user,
+    closeAreaNamingFlow,
+    clearDrawingOverlay,
+  ])
 
   const selectedArea = useMemo(
     () => parkingAreas.find((area) => area._id === selectedAreaId) || null,
@@ -455,21 +554,35 @@ export default function MapPage() {
     setIsGuiding(false)
     setIsFullScreen(previousFullScreenRef.current)
     setShowFeedbackForm(true)
+    setFeedbackNotice(null)
     setCongestionScore(2.5)
   }
 
   const submitCongestionScore = async () => {
     if (!selectedArea) return
+    if (!isLoggedIn) {
+      setFeedbackNotice({ type: "error", message: "로그인 후 혼잡도를 평가할 수 있습니다." })
+      return
+    }
+    setFeedbackNotice(null)
     setFeedbackSubmitting(true)
     try {
-      const { data } = await api.post(`/parking-areas/${selectedArea._id}/feedback`, { score: congestionScore })
-      setParkingAreas((prev) => prev.map((area) => (area._id === data._id ? data : area)))
-      alert("혼잡도 평가가 저장되었습니다.")
-      setShowFeedbackForm(false)
+      const payload = { score: congestionScore }
+      if (stadiumId) payload.stadiumId = stadiumId
+      const { data } = await api.post(`/parking-areas/${selectedArea._id}/feedback`, payload)
+      const updatedArea = data?.area ?? data
+      if (updatedArea && updatedArea._id) {
+        setParkingAreas((prev) => prev.map((area) => (area._id === updatedArea._id ? updatedArea : area)))
+      }
+      const successMessage = data?.message || "혼잡도 평가가 저장되었습니다."
+      setFeedbackNotice({ type: "success", message: successMessage })
+      setTimeout(() => {
+        setShowFeedbackForm(false)
+      }, 1600)
     } catch (error) {
       console.error("Failed to submit congestion score:", error)
       const message = error?.response?.data?.message || "혼잡도 평가를 저장할 수 없습니다."
-      alert(message)
+      setFeedbackNotice({ type: "error", message })
     } finally {
       setFeedbackSubmitting(false)
     }
@@ -507,57 +620,27 @@ export default function MapPage() {
     }
   }
 
-  const handleDrawEnd = (manager) => {
-    if (savingRef.current) return
-    const data = manager.getData()
-    const polygons = data.polygon || []
-    const polygonObject = polygons[polygons.length - 1]
-    if (!polygonObject) return
-    const polygonPath = polygonObject.points
-
-    if (Array.isArray(polygonPath)) {
-      const newPolygonCoordinates = polygonPath.map((point) => [point.x, point.y])
-      const title = window.prompt("새 주차 구역 이름을 입력해주세요:")
-      if (!title) {
-        manager.clear()
-        manager.cancel?.()
-        return
-      }
-
-      savingRef.current = true
-
-      const newArea = {
-        _id: Date.now().toString(),
-        category: search.get("category") || "UNKNOWN",
-        stadiumName: stadiumName || "미확인",
-        title,
-        polygon: { type: "Polygon", coordinates: [newPolygonCoordinates] },
-        createdByName: getUserDisplayName(user),
-      }
-
-      setParkingAreas((prev) => [...prev, newArea])
-
-      const headers = { "x-user-token": localStorage.getItem("USER_TOKEN") || "" }
-      api
-        .post("/parking-areas", newArea, { headers })
-        .then((response) => {
-          alert("새 주차 구역이 등록되었습니다.")
-          setParkingAreas((prev) => prev.map((area) => (area._id === newArea._id ? response.data : area)))
-        })
-        .catch((err) => {
-          console.error("Failed to create parking area:", err)
-          alert("저장에 실패했습니다. 잠시 후 다시 시도해주세요.")
-          setParkingAreas((prev) => prev.filter((area) => area._id !== newArea._id))
-        })
-        .finally(() => {
-          manager.clear()
-          manager.cancel?.()
-          savingRef.current = false
-        })
-    }
-  }
-
-  const toggleFullScreen = () => {
+  const handleDrawEnd = (manager) => {
+    if (savingRef.current) return
+
+    const data = manager.getData()
+    const polygons = data.polygon || []
+    const polygonObject = polygons[polygons.length - 1]
+    if (!polygonObject) return
+    const polygonPath = polygonObject.points
+
+    if (Array.isArray(polygonPath)) {
+      setAreaNamingModal({
+        open: true,
+        polygon: polygonPath.map((point) => [point.x, point.y]),
+        manager,
+      })
+      setAreaNameInput("")
+      setAreaNamingError("")
+    }
+  }
+
+const toggleFullScreen = () => {
     if (isGuiding) return
     setIsFullScreen((prev) => !prev)
   }
@@ -574,15 +657,18 @@ export default function MapPage() {
 
       <div className={`map-container ${isFullScreen ? "fullscreen" : ""}`}>
         <Map center={mapCenter} style={{ width: "100%", height: "100%" }} level={4}>
-          {myLocation && !isGuiding && <MapMarker position={myLocation} />}
-          {myLocation && isGuiding && (
+          {myLocation && (
             <CustomOverlayMap position={myLocation}>
-              <div className="user-heading-marker">
-                <div className="user-heading-marker__dot" />
-                <div
-                  className="user-heading-marker__arrow"
-                  style={{ transform: `rotate(${userHeading || 0}deg)` }}
+              <div className={`user-location-marker${isGuiding ? " user-location-marker--guiding" : ""}`}>
+                <span
+                  className="user-location-marker__arrow"
+                  style={{
+                    transform: isGuiding
+                      ? `translateY(-2px) rotate(${Number.isFinite(userHeading) ? userHeading : 0}deg)`
+                      : "translateY(-2px)",
+                  }}
                 />
+                {isGuiding && <span className="user-location-marker__pulse" />}
               </div>
             </CustomOverlayMap>
           )}
@@ -634,10 +720,10 @@ export default function MapPage() {
 
         <button
           type="button"
-          className="map-locate-btn"
+          className={`map-locate-btn${isGuiding ? " map-locate-btn--guiding" : ""}`}
           onClick={recenterToMyLocation}
           disabled={!geolocationSupported}
-          style={{ bottom: locateButtonBottom }}
+          style={{ "--locate-bottom": `${locateButtonBottom}px` }}
         >
           내 위치로
         </button>
@@ -709,6 +795,41 @@ export default function MapPage() {
         </div>
       )}
 
+      {areaNamingModal.open && (
+        <div className="map-modal-overlay">
+          <div className="map-modal">
+            <h3>새 주차 구역 이름</h3>
+            <p>이 구역을 한눈에 알아볼 수 있는 이름을 입력해주세요.</p>
+            <input
+              type="text"
+              value={areaNameInput}
+              onChange={(e) => setAreaNameInput(e.target.value)}
+              className="map-modal__input"
+              autoFocus
+            />
+            {areaNamingError && <p className="map-modal__error">{areaNamingError}</p>}
+            <div className="map-modal__actions">
+              <button type="button" onClick={handleCancelAreaNaming} disabled={areaNamingSubmitting}>
+                취소
+              </button>
+              <button type="button" onClick={handleAreaNamingSubmit} disabled={areaNamingSubmitting}>
+                {areaNamingSubmitting ? "등록 중..." : "등록하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {areaSavingStatus.message && (
+        <div
+          className={`map-toast ${
+            areaSavingStatus.type === "error" ? "map-toast--error" : "map-toast--success"
+          }`}
+        >
+          {areaSavingStatus.message}
+        </div>
+      )}
+
       {showFeedbackForm && selectedArea && (
         <div className="feedback-overlay">
           <div className="feedback-card">
@@ -730,6 +851,10 @@ export default function MapPage() {
               </div>
               <div className="feedback-score-display">{congestionScore.toFixed(1)} / 5</div>
             </div>
+            {feedbackNotice?.message && (
+              <div className={`feedback-notice feedback-notice--${feedbackNotice.type}`}>{feedbackNotice.message}</div>
+            )}
+            {!isLoggedIn && <p className="feedback-hint">로그인 후 혼잡도를 평가할 수 있습니다.</p>}
             <div className="feedback-actions">
               <button type="button" onClick={submitCongestionScore} disabled={feedbackSubmitting}>
                 {feedbackSubmitting ? "저장 중..." : "평가 제출"}

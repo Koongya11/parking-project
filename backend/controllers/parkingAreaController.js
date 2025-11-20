@@ -1,12 +1,81 @@
-﻿const ParkingArea = require("../models/ParkingArea")
+const mongoose = require("mongoose")
+const ParkingArea = require("../models/ParkingArea")
 const User = require("../models/User")
+const Match = require("../models/Match")
 
 const RESET_MINUTES = Number(process.env.CONGESTION_RESET_MINUTES || 3)
 const RESET_WINDOW_MS = Number.isFinite(RESET_MINUTES) ? RESET_MINUTES * 60 * 1000 : 0
 const DECAY_FACTOR_RAW = Number(process.env.CONGESTION_DECAY_FACTOR || 0.7)
 const DECAY_FACTOR = Number.isFinite(DECAY_FACTOR_RAW) && DECAY_FACTOR_RAW > 0 && DECAY_FACTOR_RAW < 1 ? DECAY_FACTOR_RAW : 0
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000
+
+const normalizeObjectId = (value) => {
+  if (!value) return null
+  if (value instanceof mongoose.Types.ObjectId) return value
+  if (typeof value === "string" && mongoose.Types.ObjectId.isValid(value)) return value
+  return null
+}
+
+const toKstDate = (value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  return new Date(date.getTime() + KST_OFFSET_MS)
+}
+
+const fromKstDate = (value) => new Date(value.getTime() - KST_OFFSET_MS)
+
+const getKstDayBounds = (value) => {
+  const kstDate = toKstDate(value)
+  kstDate.setUTCHours(0, 0, 0, 0)
+  const startUtc = fromKstDate(kstDate)
+  const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000 - 1)
+  return { startUtc, endUtc }
+}
+
+const getKstDayKey = (value) => {
+  const kstDate = toKstDate(value)
+  const year = kstDate.getUTCFullYear()
+  const month = String(kstDate.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(kstDate.getUTCDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+const hasMatchDayExpired = (area) => {
+  if (!area?.congestionActiveMatchStartAt) return false
+  const { endUtc } = getKstDayBounds(area.congestionActiveMatchStartAt)
+  return Date.now() > endUtc.getTime()
+}
+
+const resetCongestionState = (area) => {
+  area.congestionScoreSum = 0
+  area.congestionScoreCount = 0
+  area.congestionLastResetAt = new Date()
+  area.congestionVoters = []
+  area.congestionActiveMatchId = null
+  area.congestionActiveMatchStartAt = null
+  area.congestionActiveMatchDayKey = ""
+}
+
+const sanitizeParkingArea = (area) => {
+  if (!area) return area
+  const plain = typeof area.toObject === "function" ? area.toObject() : { ...area }
+  delete plain.congestionVoters
+  return plain
+}
+
+const findTodayMatchForStadium = async (stadiumId) => {
+  if (!stadiumId) return null
+  const { startUtc, endUtc } = getKstDayBounds(new Date())
+  return Match.findOne({
+    stadium: stadiumId,
+    startAt: { $gte: startUtc, $lte: endUtc },
+  })
+    .sort({ startAt: 1 })
+    .exec()
+}
+
 const shouldReset = (area) => {
+  if (hasMatchDayExpired(area)) return true
   if (!RESET_WINDOW_MS) return false
   const last = area.congestionLastResetAt || area.congestionLastFeedbackAt || area.updatedAt || area.createdAt
   if (!last) return false
@@ -21,9 +90,7 @@ exports.getParkingAreas = async (_req, res) => {
 
     parkingAreas.forEach((area) => {
       if (shouldReset(area)) {
-        area.congestionScoreSum = 0
-        area.congestionScoreCount = 0
-        area.congestionLastResetAt = new Date()
+        resetCongestionState(area)
         updates.push(area.save())
       }
     })
@@ -32,7 +99,8 @@ exports.getParkingAreas = async (_req, res) => {
       await Promise.allSettled(updates)
     }
 
-    res.json(parkingAreas)
+    const payload = parkingAreas.map((area) => sanitizeParkingArea(area))
+    res.json(payload)
   } catch (error) {
     console.error("getParkingAreas error", error)
     res.status(500).json({ message: "Server Error" })
@@ -42,7 +110,7 @@ exports.getParkingAreas = async (_req, res) => {
 // POST /api/parking-areas
 exports.createParkingArea = async (req, res) => {
   try {
-    const { category, stadiumName, title, polygon } = req.body
+    const { category, stadiumName, stadiumId, title, polygon } = req.body
     const userId = req.user?.id
     if (!userId) return res.status(401).json({ message: "로그인이 필요합니다." })
 
@@ -58,12 +126,13 @@ exports.createParkingArea = async (req, res) => {
     const newParkingArea = await ParkingArea.create({
       category,
       stadiumName,
+      stadiumId: normalizeObjectId(stadiumId),
       title,
       polygon,
       createdBy: user._id,
       createdByName,
     })
-    res.status(201).json(newParkingArea)
+    res.status(201).json(sanitizeParkingArea(newParkingArea))
   } catch (error) {
     console.error("createParkingArea error", error)
     res.status(500).json({ message: "Server Error" })
@@ -73,20 +142,23 @@ exports.createParkingArea = async (req, res) => {
 // POST /api/parking-areas/:id/feedback
 exports.addFeedback = async (req, res) => {
   try {
-    const { type, score } = req.body
+    const userId = req.user?.id
+    if (!userId) return res.status(401).json({ message: "로그인이 필요합니다." })
+
+    const { type, score, stadiumId: stadiumIdRaw } = req.body
     const parkingArea = await ParkingArea.findById(req.params.id)
 
     if (!parkingArea) return res.status(404).json({ message: "Parking area not found" })
 
     if (shouldReset(parkingArea)) {
-      parkingArea.congestionScoreSum = 0
-      parkingArea.congestionScoreCount = 0
-      parkingArea.congestionLastResetAt = new Date()
+      resetCongestionState(parkingArea)
     }
 
     let updated = false
+    let matchForResponse = null
+    const hasScore = typeof score === "number" && !Number.isNaN(score)
 
-    if (typeof score === "number" && !Number.isNaN(score)) {
+    if (hasScore) {
       if (score < 0 || score > 5) {
         return res.status(400).json({ message: "Score must be between 0 and 5." })
       }
@@ -94,6 +166,43 @@ exports.addFeedback = async (req, res) => {
       if (Math.abs(scaled - Math.round(scaled)) > 1e-6) {
         return res.status(400).json({ message: "Score must use 0.5 increments." })
       }
+
+      const resolvedStadiumId = normalizeObjectId(stadiumIdRaw) || normalizeObjectId(parkingArea.stadiumId)
+      if (!resolvedStadiumId) {
+        return res.status(400).json({ message: "경기장 정보가 없어 혼잡도 평가를 진행할 수 없습니다." })
+      }
+
+      const match = await findTodayMatchForStadium(resolvedStadiumId)
+      if (!match) {
+        return res.status(400).json({ message: "오늘은 경기 일정이 없어 혼잡도 평가를 할 수 없습니다." })
+      }
+
+      const now = new Date()
+      const { startUtc } = getKstDayBounds(match.startAt)
+      if (now < startUtc) {
+        return res.status(400).json({ message: "경기 당일에만 혼잡도를 평가할 수 있습니다." })
+      }
+      if (now >= match.startAt) {
+        return res.status(400).json({ message: "경기가 시작된 뒤에는 혼잡도 평가를 할 수 없습니다." })
+      }
+
+      matchForResponse = match
+      const matchIdString = match._id.toString()
+      if (!parkingArea.congestionActiveMatchId || parkingArea.congestionActiveMatchId.toString() !== matchIdString) {
+        resetCongestionState(parkingArea)
+        parkingArea.congestionActiveMatchId = match._id
+        parkingArea.congestionActiveMatchStartAt = match.startAt
+        parkingArea.congestionActiveMatchDayKey = getKstDayKey(match.startAt)
+      }
+
+      const voters = Array.isArray(parkingArea.congestionVoters) ? parkingArea.congestionVoters : []
+      parkingArea.congestionVoters = voters
+      const userIdString = userId.toString()
+      const alreadyVoted = voters.some((value) => value?.toString() === userIdString)
+      if (alreadyVoted) {
+        return res.status(409).json({ message: "이미 이 경기에서 혼잡도를 평가하셨습니다." })
+      }
+
       if (DECAY_FACTOR) {
         parkingArea.congestionScoreSum = (parkingArea.congestionScoreSum || 0) * DECAY_FACTOR
         parkingArea.congestionScoreCount = (parkingArea.congestionScoreCount || 0) * DECAY_FACTOR
@@ -104,6 +213,7 @@ exports.addFeedback = async (req, res) => {
       if (!parkingArea.congestionLastResetAt) {
         parkingArea.congestionLastResetAt = new Date()
       }
+      parkingArea.congestionVoters.push(userId)
       updated = true
     }
 
@@ -127,7 +237,12 @@ exports.addFeedback = async (req, res) => {
     }
 
     const updatedParkingArea = await parkingArea.save()
-    res.json(updatedParkingArea)
+    res.json({
+      area: sanitizeParkingArea(updatedParkingArea),
+      message: hasScore ? "혼잡도 평가가 저장되었습니다." : "피드백이 반영되었습니다.",
+      hasVoted: Boolean(hasScore),
+      matchStartAt: matchForResponse?.startAt || null,
+    })
   } catch (error) {
     console.error("addFeedback error", error)
     res.status(500).json({ message: "Server Error" })
@@ -162,7 +277,7 @@ exports.toggleSave = async (req, res) => {
     await Promise.all([user.save(), parkingArea.save()])
 
     res.json({
-      area: parkingArea,
+      area: sanitizeParkingArea(parkingArea),
       saved: !alreadySaved,
     })
   } catch (error) {
@@ -198,7 +313,7 @@ exports.updateParkingArea = async (req, res) => {
     if (req.body.polygon) area.polygon = req.body.polygon
 
     const saved = await area.save()
-    res.json(saved)
+    res.json(sanitizeParkingArea(saved))
   } catch (error) {
     console.error("updateParkingArea error", error)
     res.status(500).json({ message: "Server Error" })

@@ -3,6 +3,19 @@ import { useNavigate, useParams } from "react-router-dom"
 import api from "../api"
 import CATEGORIES from "../data/categories"
 
+const formatMatchDateTime = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "시간 미정"
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+}
+
+
 export default function CategoryPage() {
   const { categoryId } = useParams()
   const navigate = useNavigate()
@@ -42,7 +55,7 @@ export default function CategoryPage() {
         const startAt = new Date(match.startAt)
         const formatted = Number.isNaN(startAt.getTime())
           ? "시간 미정"
-          : startAt.toLocaleString("ko-KR", { hour12: false })
+          : formatMatchDateTime(startAt)
         const homeTeam = match.homeTeam || {}
         const awayTeam = match.awayTeam || {}
         const home = homeTeam.name || homeTeam.teamName || homeTeam || "-"
@@ -96,7 +109,11 @@ export default function CategoryPage() {
           style={{ color: accentColor, backgroundColor: `${accentColor}15` }}
           aria-hidden="true"
         >
-          {category.emoji}
+          {category.iconImage ? (
+            <img src={category.iconImage} alt={`${category.name} 로고`} className="category-icon-image" />
+          ) : (
+            category.emoji
+          )}
         </div>
         <div className="category-page__hero-copy">
           <h1>{category.name}</h1>
@@ -194,7 +211,11 @@ export default function CategoryPage() {
                       className="stadium-card__placeholder"
                       aria-hidden="true"
                     >
-                      {category.emoji}
+                      {category.iconImage ? (
+                        <img src={category.iconImage} alt={`${category.name} 로고`} className="category-icon-image" />
+                      ) : (
+                        category.emoji
+                      )}
                     </span>
                   )}
                   <div className="stadium-card__heading">

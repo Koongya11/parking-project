@@ -15,7 +15,7 @@ const userAuth = require('../middleware/userAuth');
 
 router.route('/').get(getParkingAreas).post(userAuth, createParkingArea);
 
-router.route('/:id/feedback').post(addFeedback);
+router.route('/:id/feedback').post(userAuth, addFeedback);
 router.route('/:id/save').post(userAuth, toggleSave);
 router.route('/:id/mine').delete(userAuth, deleteOwnParkingArea);
 

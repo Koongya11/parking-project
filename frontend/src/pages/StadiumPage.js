@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
-import { Map, MapMarker } from "react-kakao-maps-sdk"
+import { Map, MapMarker, CustomOverlayMap } from "react-kakao-maps-sdk"
 import api from "../api"
 import { useAuth } from "../context/AuthContext"
 
+const DEFAULT_CENTER = { lat: 37.566826, lng: 126.9786567 }
 const PAGE_SIZE = 5
 
 const getAverageCongestion = (area) => {
@@ -61,6 +62,9 @@ export default function StadiumPage() {
   const [page, setPage] = useState(1)
   const [loadingAreas, setLoadingAreas] = useState(false)
   const [sortMode, setSortMode] = useState("congestion")
+  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
+  const [userLocation, setUserLocation] = useState(null)
+  const previewMapRef = useRef(null)
 
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || "parking")
   const [communityPosts, setCommunityPosts] = useState([])
@@ -140,10 +144,40 @@ export default function StadiumPage() {
     fetchCommunityPosts()
   }, [fetchCommunityPosts])
 
-  if (!stadium) return null
+  const [lng, lat] = stadium?.location?.coordinates || [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat]
+  const stadiumCenter = useMemo(() => ({ lat, lng }), [lat, lng])
 
-  const [lng, lat] = stadium.location?.coordinates || [126.9786567, 37.566826]
-  const center = { lat, lng }
+  const updateMapCenter = useCallback((position) => {
+    if (!position) return
+    setMapCenter({ lat: position.lat, lng: position.lng })
+  }, [])
+
+  useEffect(() => {
+    updateMapCenter(stadiumCenter)
+  }, [stadiumCenter, updateMapCenter])
+
+  const panPreviewMap = useCallback(
+    (position, { instant = false } = {}) => {
+      if (!position) return
+      updateMapCenter(position)
+      const map = previewMapRef.current
+      if (map && window?.kakao?.maps) {
+        const target = new window.kakao.maps.LatLng(position.lat, position.lng)
+        if (instant) {
+          map.setCenter(target)
+        } else {
+          map.panTo(target)
+        }
+      }
+    },
+    [updateMapCenter],
+  )
+
+  useEffect(() => {
+    panPreviewMap(stadiumCenter, { instant: true })
+  }, [stadiumCenter, panPreviewMap])
+
+  if (!stadium) return null
 
   const buildMapUrl = (params = {}) => {
     const baseParams = new URLSearchParams()
@@ -161,8 +195,8 @@ export default function StadiumPage() {
   const openMapView = () => {
     navigate(
       buildMapUrl({
-        lat: center.lat,
-        lng: center.lng,
+        lat: stadiumCenter.lat,
+        lng: stadiumCenter.lng,
         follow: 0,
       }),
     )
@@ -171,15 +205,16 @@ export default function StadiumPage() {
   const openMapForAreaCreation = () => {
     navigate(
       buildMapUrl({
-        lat: center.lat,
-        lng: center.lng,
+        lat: stadiumCenter.lat,
+        lng: stadiumCenter.lng,
         draw: 1,
+        follow: 0,
       }),
     )
   }
 
   const openAreaOnMap = (area) => {
-    const centroid = getAreaCentroid(area) || center
+    const centroid = getAreaCentroid(area) || stadiumCenter
     navigate(
       buildMapUrl({
         lat: centroid.lat,
@@ -210,6 +245,34 @@ export default function StadiumPage() {
   const openCommunityPost = (post) => {
     if (!post?._id) return
     navigate(`/stadium/${id}/community/${post._id}`, { state: { stadium, post, activeTab: "community" } })
+  }
+
+  const geolocationSupported = typeof navigator !== "undefined" && !!navigator.geolocation
+
+  const recenterPreviewToStadium = (event) => {
+    if (event) event.stopPropagation()
+    panPreviewMap(stadiumCenter)
+  }
+
+  const handlePreviewLocateMe = (event) => {
+    event.stopPropagation()
+    if (!geolocationSupported) {
+      alert("현재 브라우저에서 내 위치를 확인할 수 없습니다.")
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextCenter = { lat: position.coords.latitude, lng: position.coords.longitude }
+        setUserLocation(nextCenter)
+        panPreviewMap(nextCenter)
+      },
+      (error) => {
+        console.error("failed to fetch current location", error)
+        alert("내 위치를 불러오지 못했어요. 위치 접근을 허용해주세요.")
+      },
+      { enableHighAccuracy: true, maximumAge: 8000, timeout: 15000 },
+    )
   }
 
 
@@ -245,9 +308,41 @@ export default function StadiumPage() {
       {activeTab === "parking" && (
         <>
           <div className="map-preview" onClick={openMapView} role="button" tabIndex={0}>
-            <Map center={center} style={{ width: "100%", height: 340 }} level={3}>
-              <MapMarker position={center} />
+            <Map
+              center={mapCenter || stadiumCenter}
+              style={{ width: "100%", height: 340 }}
+              level={3}
+              isPanto
+              onCreate={(map) => {
+                previewMapRef.current = map
+                const target = mapCenter || stadiumCenter
+                if (window?.kakao?.maps && target) {
+                  map.setCenter(new window.kakao.maps.LatLng(target.lat, target.lng))
+                }
+              }}
+            >
+              <MapMarker position={stadiumCenter} />
+              {userLocation && (
+                <CustomOverlayMap position={userLocation}>
+                  <div className="user-location-marker">
+                    <span className="user-location-marker__arrow" />
+                  </div>
+                </CustomOverlayMap>
+              )}
             </Map>
+            <div className="map-preview__controls" onClick={(event) => event.stopPropagation()}>
+              <button type="button" className="map-preview__control" onClick={recenterPreviewToStadium}>
+                경기장
+              </button>
+              <button
+                type="button"
+                className="map-preview__control"
+                onClick={handlePreviewLocateMe}
+                disabled={!geolocationSupported}
+              >
+                내 위치
+              </button>
+            </div>
           </div>
           <p className="map-preview__hint">지도를 눌러 보다 많은 주차 구역을 확인해 보세요.</p>
 

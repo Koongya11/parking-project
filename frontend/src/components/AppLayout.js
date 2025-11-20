@@ -179,7 +179,11 @@ export default function AppLayout() {
                   onClick={() => goCategory(category.id)}
                 >
                   <span className="sidebar__emoji" aria-hidden="true">
-                    {category.emoji}
+                    {category.iconImage ? (
+                      <img src={category.iconImage} alt={`${category.name} 로고`} className="category-icon-image" />
+                    ) : (
+                      category.emoji
+                    )}
                   </span>
                   <span>{category.name}</span>
                 </button>

@@ -14,15 +14,26 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "이메일, 비밀번호, 닉네임을 모두 입력해 주세요." })
     }
 
+    const nicknameTrimmed = nickname.trim()
+    const passwordRule = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()[\]{};:'"\\|,.<>/?`~\-_=+]).{8,}$/
+    if (!passwordRule.test(password)) {
+      return res.status(400).json({
+        message: "비밀번호는 영어, 숫자, 특수문자를 모두 포함한 8자 이상이어야 합니다.",
+      })
+    }
+
     const existing = await User.findOne({ email })
     if (existing) return res.status(409).json({ message: "이미 가입된 이메일입니다." })
+
+    const nicknameExists = await User.findOne({ nickname: nicknameTrimmed })
+    if (nicknameExists) return res.status(409).json({ message: "이미 사용 중인 닉네임입니다." })
 
     const hashed = await bcrypt.hash(password, 10)
     const user = await User.create({
       email,
       password: hashed,
       provider: "local",
-      nickname: nickname.trim(),
+      nickname: nicknameTrimmed,
     })
 
     const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "7d" })

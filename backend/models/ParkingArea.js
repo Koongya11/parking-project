@@ -27,6 +27,7 @@ const polygonSchema = new mongoose.Schema({
 const parkingAreaSchema = new mongoose.Schema({
   category: { type: String, required: true },
   stadiumName: { type: String, required: true },
+  stadiumId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stadium', default: null },
   title: { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdByName: { type: String, trim: true },
@@ -42,6 +43,13 @@ const parkingAreaSchema = new mongoose.Schema({
   congestionScoreCount: { type: Number, default: 0 },
   congestionLastResetAt: { type: Date, default: Date.now },
   congestionLastFeedbackAt: { type: Date, default: null },
+  congestionActiveMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match', default: null },
+  congestionActiveMatchStartAt: { type: Date, default: null },
+  congestionActiveMatchDayKey: { type: String, default: '' },
+  congestionVoters: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    default: [],
+  },
   createdAt: { type: Date, default: Date.now },
 })
 

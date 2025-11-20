@@ -10,6 +10,18 @@ const formatNumber = (value) => {
   return value.toLocaleString("ko-KR")
 }
 
+const formatMatchDateTime = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "시간 정보 없음"
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [stats, setStats] = useState({
@@ -94,9 +106,7 @@ export default function Home() {
               awayLogo: awayTeam.logoImage || "",
               stadiumData,
               stadiumId: stadiumData?._id || match.stadium?._id || match.stadium,
-              timeLabel: isValidStart
-                ? startAt.toLocaleString('ko-KR', { hour12: false })
-                : '시간 미정',
+              timeLabel: isValidStart ? formatMatchDateTime(startAt) : "시간 정보 없음",
               status,
               statusTone,
               startAt: isValidStart ? timestamp : null,
@@ -173,7 +183,11 @@ export default function Home() {
                     fontSize: 26,
                   }}
                 >
-                  {category.emoji}
+                  {category.iconImage ? (
+                    <img src={category.iconImage} alt={`${category.name} 로고`} className="category-icon-image" />
+                  ) : (
+                    category.emoji
+                  )}
                 </span>
                 <div>
                   <h3 className="surface-card__title">{category.name}</h3>
@@ -262,7 +276,6 @@ export default function Home() {
                   </div>
                   <span className="match-card__time">{game.timeLabel}</span>
                 </div>
-                <span className={`match-card__status match-card__status--${game.statusTone}`}>{game.status}</span>
               </button>
             ))}
           </div>

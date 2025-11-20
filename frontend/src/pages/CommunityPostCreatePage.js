@@ -22,6 +22,7 @@ export default function CommunityPostCreatePage() {
   const [submitting, setSubmitting] = useState(false)
 
   const fileInputRef = useRef(null)
+  const messageInputRef = useRef(null)
 
   useEffect(() => {
     if (stadium) return
@@ -77,6 +78,25 @@ export default function CommunityPostCreatePage() {
       return
     }
     setFormFiles(limited)
+  }
+
+  const insertImagePlaceholder = (previewIndex) => {
+    const placeholder = `{{img${previewIndex + 1}}}`
+    setFormValues((prev) => {
+      const currentMessage = prev.message || ""
+      const textarea = messageInputRef.current
+      if (!textarea) {
+        return { ...prev, message: `${currentMessage}${currentMessage ? "\n" : ""}${placeholder}` }
+      }
+      const { selectionStart = currentMessage.length, selectionEnd = currentMessage.length } = textarea
+      const nextMessage = `${currentMessage.slice(0, selectionStart)}${placeholder}${currentMessage.slice(selectionEnd)}`
+      requestAnimationFrame(() => {
+        textarea.focus()
+        const cursor = selectionStart + placeholder.length
+        textarea.setSelectionRange(cursor, cursor)
+      })
+      return { ...prev, message: nextMessage }
+    })
   }
 
   const userNickname = useMemo(() => {
@@ -162,6 +182,7 @@ export default function CommunityPostCreatePage() {
           <textarea
             rows={6}
             value={formValues.message}
+            ref={messageInputRef}
             onChange={(event) => handleFormChange("message", event.target.value)}
             placeholder="주차 팁이나 관람 후기를 자세히 작성해 주세요."
             disabled={submitting}
@@ -177,13 +198,25 @@ export default function CommunityPostCreatePage() {
             onChange={handleImageChange}
             disabled={submitting}
           />
+          <small className="form-help">
+            본문 중간에 사진을 넣고 싶다면 아래 미리보기의 <strong>본문에 삽입</strong> 버튼을 눌러주세요. 자동으로{" "}
+            <code>{`{{img번호}}`}</code> 형태의 토큰이 입력됩니다.
+          </small>
         </label>
         {imagePreviews.length > 0 && (
           <div className="community-form__previews">
-            {imagePreviews.map((preview) => (
+            {imagePreviews.map((preview, index) => (
               <div key={preview.url} className="community-form__preview">
                 <img src={preview.url} alt={preview.name} />
                 <span>{preview.name}</span>
+                <button
+                  type="button"
+                  className="pill-button"
+                  onClick={() => insertImagePlaceholder(index)}
+                  style={{ marginTop: 8 }}
+                >
+                  본문에 삽입
+                </button>
               </div>
             ))}
           </div>

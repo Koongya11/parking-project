@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import api from "../api"
 import { useAuth } from "../context/AuthContext"
@@ -217,6 +217,66 @@ export default function CommunityPostPage() {
     }
   }
 
+  const renderTextChunk = (text, key) => {
+    if (!text) return null
+    const lines = text.split(/\n/)
+    return (
+      <p key={key}>
+        {lines.map((line, idx) => (
+          <React.Fragment key={`${key}-${idx}`}>
+            {line}
+            {idx < lines.length - 1 && <br />}
+          </React.Fragment>
+        ))}
+      </p>
+    )
+  }
+
+  const renderPostBody = () => {
+    const content = post?.message || ""
+    const images = Array.isArray(post?.images) ? post.images : []
+    const parts = []
+    const usedImages = new Set()
+    const regex = /\{\{img(\d+)\}\}/gi
+    let lastIndex = 0
+    let match
+    while ((match = regex.exec(content)) !== null) {
+      const textChunk = content.slice(lastIndex, match.index)
+      if (textChunk) {
+        parts.push({ type: "text", key: `text-${lastIndex}`, value: textChunk })
+      }
+      const idx = Number(match[1]) - 1
+      if (!Number.isNaN(idx) && images[idx]) {
+        parts.push({ type: "image", key: `img-${idx}-${match.index}`, value: resolveImageUrl(images[idx]) })
+        usedImages.add(idx)
+      }
+      lastIndex = regex.lastIndex
+    }
+    const rest = content.slice(lastIndex)
+    if (rest) {
+      parts.push({ type: "text", key: `text-${lastIndex}`, value: rest })
+    }
+
+    return (
+      <>
+        <div className="community-detail__body">
+          {parts.length === 0 && renderTextChunk(content, "only-text")}
+          {parts.map((part) =>
+            part.type === "text" ? renderTextChunk(part.value, part.key) : <img key={part.key} src={part.value} alt="본문 이미지" />,
+          )}
+        </div>
+        {images.length > 0 && usedImages.size < images.length && (
+          <div className="community-detail__images">
+            {images.map((image, idx) => {
+              if (usedImages.has(idx)) return null
+              return <img key={image} src={resolveImageUrl(image)} alt="게시글 첨부 이미지" />
+            })}
+          </div>
+        )}
+      </>
+    )
+  }
+
   const formatDate = (value) => {
     if (!value) return "-"
     try {
@@ -269,7 +329,7 @@ export default function CommunityPostPage() {
             </div>
           </header>
 
-          <p className="community-detail__body">{post.message}</p>
+          {renderPostBody()}
 
           <div className="community-recommend">
             <button type="button" className={`pill-button ${hasRecommended ? "is-active" : ""}`} onClick={handleRecommend} disabled={recommendSubmitting}>
@@ -277,14 +337,6 @@ export default function CommunityPostPage() {
             </button>
             <span className="community-recommend__count">👍 {post.recommendCount ?? 0}</span>
           </div>
-
-          {Array.isArray(post.images) && post.images.length > 0 && (
-            <div className="community-detail__images">
-              {post.images.map((image) => (
-                <img key={image} src={resolveImageUrl(image)} alt="게시글 첨부 이미지" />
-              ))}
-            </div>
-          )}
 
           <section className="community-comments">
             <h3>댓글</h3>
