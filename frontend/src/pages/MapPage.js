@@ -125,6 +125,14 @@ export default function MapPage() {
   const [pendingSaveAction, setPendingSaveAction] = useState(null)
 
   const [drawingManager, setDrawingManager] = useState(null)
+
+  const updateMapCenter = useCallback(
+    (center) => {
+      if (!center || typeof center.lat !== "number" || typeof center.lng !== "number") return
+      setMapCenter({ lat: center.lat, lng: center.lng })
+    },
+    [setMapCenter],
+  )
   const savingRef = useRef(false)
   const previousFullScreenRef = useRef(false)
   const lastRouteKeyRef = useRef("")
@@ -293,9 +301,9 @@ export default function MapPage() {
     const lat = toNumber(search.get("lat"))
     const lng = toNumber(search.get("lng"))
     if (lat !== null && lng !== null) {
-      setMapCenter({ lat, lng })
+      updateMapCenter({ lat, lng })
     }
-  }, [search])
+  }, [search, updateMapCenter])
 
   useEffect(() => {
     if (isDrawMode && drawingManager && window.kakao?.maps?.drawing) {
@@ -342,14 +350,14 @@ export default function MapPage() {
           setUserHeading(position.coords.heading)
         }
         if (followUser && !selectedAreaId) {
-          setMapCenter(newPos)
+          updateMapCenter(newPos)
         }
       },
       (err) => {
         console.error("Geolocation error:", err)
       },
     )
-  }, [followUser, selectedAreaId])
+  }, [followUser, selectedAreaId, updateMapCenter])
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return undefined
@@ -363,7 +371,7 @@ export default function MapPage() {
             setUserHeading(position.coords.heading)
           }
           if (isGuiding || followUser) {
-            setMapCenter(newPos)
+            updateMapCenter(newPos)
           }
         },
         (error) => {
@@ -384,7 +392,7 @@ export default function MapPage() {
     }
 
     return undefined
-  }, [isGuiding, followUser])
+  }, [isGuiding, followUser, updateMapCenter])
 
   useEffect(() => {
     setSelectedAreaId("")
@@ -433,7 +441,7 @@ export default function MapPage() {
       }
 
       if (recenter) {
-        setMapCenter({ lat: centroid.lat, lng: centroid.lng })
+        updateMapCenter({ lat: centroid.lat, lng: centroid.lng })
       }
 
       try {
@@ -458,12 +466,12 @@ export default function MapPage() {
         if (shouldToggleLoading) setRouteLoading(false)
       }
     },
-    [myLocation],
+    [myLocation, updateMapCenter],
   )
 
   const recenterToMyLocation = useCallback(() => {
     if (myLocation) {
-      setMapCenter(myLocation)
+      updateMapCenter(myLocation)
       return
     }
 
@@ -476,7 +484,7 @@ export default function MapPage() {
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude }
         setMyLocation(newPos)
-        setMapCenter(newPos)
+        updateMapCenter(newPos)
       },
       (error) => {
         console.error("Geolocation error:", error)
@@ -484,7 +492,7 @@ export default function MapPage() {
       },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
     )
-  }, [myLocation])
+  }, [myLocation, updateMapCenter])
 
   const handleAreaSelect = useCallback(
     (area, { recenter = true, silent = false } = {}) => {
@@ -499,11 +507,11 @@ export default function MapPage() {
       setCongestionScore(2.5)
       const centroid = getAreaCentroid(area)
       if (centroid) {
-        setMapCenter({ lat: centroid.lat, lng: centroid.lng })
+        updateMapCenter({ lat: centroid.lat, lng: centroid.lng })
       }
       fetchRouteFor(area, { recenter, force: true, silent })
     },
-    [fetchRouteFor],
+    [fetchRouteFor, updateMapCenter],
   )
 
   useEffect(() => {
