@@ -1,10 +1,8 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  min-height: 100%;
-  background: #f8fbff;
-  overflow-x: hidden;
+:root {
+  --safe-area-top: 0px;
+  --safe-area-bottom: 0px;
+  --safe-area-left: 0px;
+  --safe-area-right: 0px;
 }
 
 @supports (padding: env(safe-area-inset-top)) {
@@ -14,23 +12,23 @@ html, body {
     --safe-area-left: env(safe-area-inset-left);
     --safe-area-right: env(safe-area-inset-right);
   }
-
-  body {
-    padding-top: max(16px, var(--safe-area-top));
-    padding-bottom: max(16px, var(--safe-area-bottom));
-    padding-left: max(16px, var(--safe-area-left));
-    padding-right: max(16px, var(--safe-area-right));
-  }
-
-  #root,
-  .app-layout {
-    padding-top: var(--safe-area-top);
-    padding-bottom: var(--safe-area-bottom);
-    padding-left: var(--safe-area-left);
-    padding-right: var(--safe-area-right);
-  }
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #f8fbff;
+  overflow-x: hidden;
+}
 
 .App {
   display: flex;
@@ -178,13 +176,15 @@ html, body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .top-nav {
   position: relative;
   top: auto;
   z-index: 50;
-  padding: 12px 0;
+  padding: calc(12px + var(--safe-area-top)) 0 calc(12px + var(--safe-area-bottom));
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
@@ -194,11 +194,12 @@ html, body {
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 calc(16px + var(--safe-area-right)) 0 calc(16px + var(--safe-area-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .back-button {
@@ -238,17 +239,18 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
-  min-width: 140px;
-  flex: 0 1 auto;
+  margin: 0 auto;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .top-nav__actions {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1 1 0;
   justify-content: flex-end;
   min-width: 0;
+  flex: 0 1 auto;
   flex-wrap: nowrap;
 }
 
@@ -261,6 +263,7 @@ html, body {
   font-size: 14px;
   transition: background-color .15s ease, box-shadow .15s ease;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .top-nav__actions button:hover {
@@ -307,11 +310,12 @@ html, body {
 }
 
 .top-nav__left {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  flex: 1 1 0;
+  gap: 10px;
   min-width: 0;
+  flex: 0 1 auto;
+  justify-content: flex-start;
 }
 
 .sidebar-toggle {
@@ -442,11 +446,12 @@ html, body {
 
 .app-layout__content {
   flex: 1;
+  width: 100%;
   min-width: 0;
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   overflow: visible;
 }
 
@@ -469,6 +474,12 @@ html, body {
   inset: 0;
   background: rgba(15, 23, 42, .4);
   z-index: 200;
+}
+
+@media (max-width: 768px) {
+  .top-nav__inner {
+    max-width: none;
+  }
 }
 
 @media (min-width: 900px) {
@@ -2287,39 +2298,6 @@ html, body {
   font-weight: 600;
 }
 
-@media (max-width: 520px) {
-  .top-nav__inner {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    row-gap: 8px;
-  }
-
-  .top-nav__left {
-    order: 1;
-    flex: 1 1 auto;
-    justify-content: flex-start;
-  }
-
-  .top-nav__brand {
-    order: 2;
-    flex: 1 0 100%;
-    text-align: center;
-  }
-
-  .top-nav__actions {
-    order: 3;
-    flex: 1 0 100%;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .top-nav__actions button,
-  .profile__trigger {
-    flex: 1 1 48%;
-    text-align: center;
-  }
-}
-
 @media (max-width: 600px) {
   .community-intro {
     flex-direction: column;
@@ -2487,12 +2465,15 @@ html, body {
 }
 
   .top-nav__inner {
-    padding: 0 12px;
-    gap: 10px;
+    padding: 0 10px;
+    gap: 6px;
+    min-height: 58px;
+    flex-wrap: nowrap;
+    position: relative;
   }
 
   .top-nav__left {
-    gap: 8px;
+    gap: 6px;
   }
 
   .top-nav__actions {
@@ -2502,6 +2483,10 @@ html, body {
   .top-nav__brand {
     font-size: 16px;
     min-width: 0;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
   }
 
   .top-nav__actions button,
