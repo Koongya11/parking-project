@@ -4,6 +4,8 @@ import Home from "./pages/Home"
 import CategoryPage from "./pages/CategoryPage"
 import MapPage from "./pages/MapPage"
 import StadiumPage from "./pages/StadiumPage"
+import NoticePage from "./pages/NoticePage"
+import NoticeDetailPage from "./pages/NoticeDetailPage"
 import CommunityPostPage from "./pages/CommunityPostPage"
 import CommunityPostCreatePage from "./pages/CommunityPostCreatePage"
 import NotFound from "./pages/NotFound"
@@ -14,6 +16,7 @@ import AdminTeams from "./pages/admin/AdminTeams"
 import AdminMatches from "./pages/admin/AdminMatches"
 import AdminParkingAreas from "./pages/admin/AdminParkingAreas"
 import AdminCommunity from "./pages/admin/AdminCommunity"
+import AdminNotices from "./pages/admin/AdminNotices"
 import UserLogin from "./pages/auth/UserLogin"
 import UserRegister from "./pages/auth/UserRegister"
 import AppLayout from "./components/AppLayout"
@@ -56,6 +59,8 @@ export default function App() {
             <Route path="stadium/:id/community/new" element={<CommunityPostCreatePage />} />
             <Route path="stadium/:id/community/:postId" element={<CommunityPostPage />} />
             <Route path="map" element={<MapPage />} />
+            <Route path="notices" element={<NoticePage />} />
+            <Route path="notice/:noticeId" element={<NoticeDetailPage />} />
             <Route path="login" element={<UserLogin />} />
             <Route path="register" element={<UserRegister />} />
             <Route path="profile" element={<ProfilePage />} />
@@ -67,6 +72,7 @@ export default function App() {
           <Route path="/admin/matches" element={<AdminMatches />} />
           <Route path="/admin/parking-areas" element={<AdminParkingAreas />} />
           <Route path="/admin/community" element={<AdminCommunity />} />
+          <Route path="/admin/notices" element={<AdminNotices />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
       </AuthProvider>

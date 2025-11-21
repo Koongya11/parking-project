@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../api"
 import CATEGORIES from "../data/categories"
@@ -32,6 +32,7 @@ export default function Home() {
   const [highlightMatches, setHighlightMatches] = useState([])
   const [loadingHomeData, setLoadingHomeData] = useState(true)
   const [homeError, setHomeError] = useState("")
+  const [latestNotice, setLatestNotice] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -133,6 +134,23 @@ export default function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    let mounted = true
+    const fetchLatestNotice = async () => {
+      try {
+        const { data } = await api.get("/notices", { params: { limit: 1 } })
+        if (!mounted) return
+        setLatestNotice(Array.isArray(data) && data.length > 0 ? data[0] : null)
+      } catch (error) {
+        if (mounted) setLatestNotice(null)
+      }
+    }
+    fetchLatestNotice()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   const statsEntries = useMemo(
     () => [
       { label: "등록 경기장", value: stats.stadiums, desc: "전체 카테고리 기준" },
@@ -149,11 +167,27 @@ export default function Home() {
         <p className="page-hero__subtitle">
           경기장 주변 주차 상황을 한눈에 확인하고, 가장 가까운 공간까지 실시간 길찾기를 이용해 보세요.
         </p>
-        <div className="pill-group">
-          <span className="pill">경기장 데이터</span>
-          <span className="pill">주차장 공유</span>
-          <span className="pill">실시간 가이드</span>
-        </div>
+        <button
+          type="button"
+          className="cta-button cta-button--muted"
+          style={{ marginTop: 16 }}
+          onClick={() => navigate("/notices")}
+        >
+          공지사항
+        </button>
+        {latestNotice && (
+          <div className="home-latest-notice">
+            <span className="home-latest-notice__label" aria-label="최근 공지">
+              📢 최근 공지
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate("/notices", { state: { noticeId: latestNotice._id || "" } })}
+            >
+              {latestNotice.title}
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="section">
@@ -219,7 +253,7 @@ export default function Home() {
             <div key={stat.label} className="stat-card">
               <span className="stat-card__label">{stat.label}</span>
               <strong className="stat-card__value">
-                {typeof stat.value === "number" ? formatNumber(stat.value) : loadingHomeData ? "—" : "0"}
+                {typeof stat.value === "number" ? formatNumber(stat.value) : loadingHomeData ? "?" : "0"}
               </strong>
               <span className="stat-card__desc">{stat.desc}</span>
             </div>
