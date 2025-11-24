@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+﻿import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../api"
 import CATEGORIES from "../data/categories"
@@ -154,7 +154,7 @@ export default function Home() {
   const statsEntries = useMemo(
     () => [
       { label: "등록 경기장", value: stats.stadiums, desc: "전체 카테고리 기준" },
-      { label: "등록 주차 구역", value: stats.parkingAreas, desc: "실측 및 제보 데이터" },
+      { label: "등록 주차 구역", value: stats.parkingAreas, desc: "제보 데이터" },
       { label: "이번 주 예정 경기", value: stats.matchesWeek, desc: "앞으로 7일 기준" },
     ],
     [stats.parkingAreas, stats.matchesWeek, stats.stadiums],
@@ -165,7 +165,7 @@ export default function Home() {
       <section className="page-hero">
         <h1 className="page-hero__title">주차 정보 지도</h1>
         <p className="page-hero__subtitle">
-          경기장 주변 주차 상황을 한눈에 확인하고, 가장 가까운 공간까지 실시간 길찾기를 이용해 보세요.
+          경기장 주변 주차 상황을 한눈에 확인하고, 실시간 길찾기를 이용해 보세요.
         </p>
         <button
           type="button"
@@ -193,7 +193,7 @@ export default function Home() {
       <section className="section">
         <div className="section__head">
           <h2>관심 종목 선택</h2>
-          <span>종목별 경기장 정보를 빠르게 찾아보세요</span>
+          <span>종목별 경기장 정보를 빠르게 찾아보세요.</span>
         </div>
         <div className="card-grid card-grid--cols-2">
           {CATEGORIES.map((category) => (
@@ -235,10 +235,9 @@ export default function Home() {
 
       <section className="home-highlight">
         <div className="home-highlight__copy">
-          <p className="home-highlight__kicker">이번 주 이용 현황</p>
           <h2>
             {typeof stats.stadiums === "number" && typeof stats.parkingAreas === "number"
-              ? `지금 ${formatNumber(stats.stadiums)}개 경기장과 ${formatNumber(stats.parkingAreas)}개 주차 구역이 연결되어 있어요.`
+              ? `${formatNumber(stats.stadiums)}개 경기장과 ${formatNumber(stats.parkingAreas)}개 주차 구역이 연결되어 있어요.`
               : "실제 주차 데이터를 불러오는 중입니다."}
           </h2>
           <p>
@@ -264,7 +263,6 @@ export default function Home() {
       <section className="section home-games-section">
         <div className="section__head">
           <h2>이번 주 경기</h2>
-          <span>다가오는 경기 일정과 혼잡도를 미리 확인하세요.</span>
         </div>
         {loadingHomeData ? (
           <div className="empty-state--subtle">경기 정보를 불러오는 중입니다…</div>

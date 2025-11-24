@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { Map, MapMarker, CustomOverlayMap } from "react-kakao-maps-sdk"
 import api from "../api"
@@ -365,7 +365,7 @@ export default function StadiumPage() {
                       className={sortMode === "upvote" ? "is-active" : ""}
                       onClick={() => setSortMode("upvote")}
                     >
-                      추천 많은 순
+                      즐겨찾기 순
                     </button>
                   </div>
                 </div>
@@ -447,8 +447,7 @@ export default function StadiumPage() {
           <div className="community-intro">
             <div>
               <p>
-                여기서 직접 다녀온 주차 팁과 관람 후기를 이곳에 남겨 주세요. 이 게시판은 자유롭게 소통하는
-                커뮤니티예요.
+                이 게시판은 자유롭게 소통하는 커뮤니티예요.
               </p>
             </div>
             <button

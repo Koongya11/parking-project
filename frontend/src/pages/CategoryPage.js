@@ -183,7 +183,7 @@ export default function CategoryPage() {
         <div className="category-page__section-head">
           <h2>경기장 주차 정보</h2>
           {stadiums.length > 0 && (
-            <span>상세 정보를 확인하려면 카드를 눌러 주세요</span>
+            <span>상세 정보를 확인하려면 원하는 팀을 눌러 주세요.</span>
           )}
         </div>
 
