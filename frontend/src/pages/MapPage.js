@@ -199,28 +199,7 @@ const getBearingDegrees = (from, to) => {
   return bearing
 }
 
-const offsetPosition = (origin, bearingDeg, distanceMeters) => {
-  if (!origin || !Number.isFinite(bearingDeg) || !Number.isFinite(distanceMeters)) return origin
-  if (distanceMeters === 0) return origin
-  const R = 6371000
-  const angularDistance = distanceMeters / R
-  const bearing = toRadians(bearingDeg)
-  const lat1 = toRadians(origin.lat)
-  const lng1 = toRadians(origin.lng)
-  const lat2 = Math.asin(
-    Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing),
-  )
-  const lng2 =
-    lng1 +
-    Math.atan2(
-      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
-      Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2),
-    )
-  return { lat: toDegrees(lat2), lng: toDegrees(lng2) }
-}
-
 const MIN_HEADING_DISTANCE = 3
-const GUIDANCE_LOOKAHEAD_METERS = 140
 
 export default function MapPage() {
 
@@ -599,15 +578,11 @@ export default function MapPage() {
     const mod = effectiveHeading % 360
     return mod < 0 ? mod + 360 : mod
   }, [effectiveHeading, hasHeading])
-  const shouldRotateMap = isGuiding && hasHeading
   const arrowHeading = hasHeading ? normalizedHeading : 0
   const mapDisplayCenter = useMemo(() => {
-    if (isGuiding && myLocation && Number.isFinite(arrowHeading)) {
-      const projected = offsetPosition(myLocation, arrowHeading, GUIDANCE_LOOKAHEAD_METERS)
-      if (projected) return projected
-    }
+    if (myLocation) return myLocation
     return mapCenter
-  }, [isGuiding, myLocation, arrowHeading, mapCenter])
+  }, [myLocation, mapCenter])
 
 
   const selectedAreaIdString = selectedArea ? getIdString(selectedArea._id) : ""
