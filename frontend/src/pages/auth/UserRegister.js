@@ -9,6 +9,7 @@ export default function UserRegister() {
   const [password, setPassword] = useState("")
   const [nickname, setNickname] = useState("")
   const [loading, setLoading] = useState(false)
+  const [formNotice, setFormNotice] = useState({ type: "", message: "" })
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
@@ -18,18 +19,19 @@ export default function UserRegister() {
   const submit = async (event) => {
     event.preventDefault()
     if (!email || !password || !nickname.trim()) {
-      alert("이메일, 비밀번호, 닉네임을 모두 입력해 주세요.")
+      setFormNotice({ type: "error", message: "???, ????, ???? ?? ??? ???." })
       return
     }
     setLoading(true)
+    setFormNotice({ type: "", message: "" })
     try {
       const { data } = await api.post("/auth/register", { email, password, nickname: nickname.trim() })
       login(data.token)
       navigate(redirectTo, { replace: true })
     } catch (err) {
       console.error("register failed", err)
-      const message = err?.response?.data?.message || "가입에 실패했습니다."
-      alert(message)
+      const message = err?.response?.data?.message || "??? ??????."
+      setFormNotice({ type: "error", message })
     } finally {
       setLoading(false)
     }
@@ -46,6 +48,11 @@ export default function UserRegister() {
         </div>
 
         <form onSubmit={submit}>
+          {formNotice.message && (
+            <div className={`auth-card__notice auth-card__notice--${formNotice.type}`} role="alert">
+              {formNotice.message}
+            </div>
+          )}
           <input
             type="email"
             placeholder="이메일"
