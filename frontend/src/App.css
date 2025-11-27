@@ -51,19 +51,33 @@ body {
 
 .map-container {
   position: relative;
-  flex-grow: 1;
+  flex: 1 1 auto;
   width: 100%;
+  min-height: 420px;
   overflow: hidden;
 }
 
+.map-rotation-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .map-rotation-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   transform-origin: 50% 50%;
-  transition: transform 160ms linear;
+  transition: transform 200ms linear;
 }
 
 .map-rotation-wrapper--active {
+  width: 150%;
+  height: 150%;
+  top: 50%;
+  left: 50%;
   will-change: transform;
 }
 
