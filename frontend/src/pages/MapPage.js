@@ -199,8 +199,28 @@ const getBearingDegrees = (from, to) => {
   return bearing
 }
 
-const MIN_HEADING_DISTANCE = 3
+const offsetPosition = (origin, bearingDeg, distanceMeters) => {
+  if (!origin || !Number.isFinite(bearingDeg) || !Number.isFinite(distanceMeters)) return origin
+  if (distanceMeters === 0) return origin
+  const R = 6371000
+  const angularDistance = distanceMeters / R
+  const bearing = toRadians(bearingDeg)
+  const lat1 = toRadians(origin.lat)
+  const lng1 = toRadians(origin.lng)
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing),
+  )
+  const lng2 =
+    lng1 +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
+      Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2),
+    )
+  return { lat: toDegrees(lat2), lng: toDegrees(lng2) }
+}
 
+const MIN_HEADING_DISTANCE = 3
+const GUIDANCE_LOOKAHEAD_METERS = 140
 
 export default function MapPage() {
 
@@ -581,6 +601,13 @@ export default function MapPage() {
   }, [effectiveHeading, hasHeading])
   const shouldRotateMap = isGuiding && hasHeading
   const arrowHeading = hasHeading ? normalizedHeading : 0
+  const mapDisplayCenter = useMemo(() => {
+    if (isGuiding && myLocation && Number.isFinite(arrowHeading)) {
+      const projected = offsetPosition(myLocation, arrowHeading, GUIDANCE_LOOKAHEAD_METERS)
+      if (projected) return projected
+    }
+    return mapCenter
+  }, [isGuiding, myLocation, arrowHeading, mapCenter])
 
 
   const selectedAreaIdString = selectedArea ? getIdString(selectedArea._id) : ""
@@ -1370,13 +1397,6 @@ const toggleFullScreen = () => {
 
   const locateButtonBottom = selectedArea && !isGuiding && !showFeedbackForm ? 260 : 24
 
-  const mapRotationAngle = shouldRotateMap ? -arrowHeading : 0
-  const mapRotationStyle = shouldRotateMap
-    ? { transform: `translate(-50%, -50%) rotate(${mapRotationAngle}deg)` }
-    : { transform: "none" }
-
-
-
   return (
 
     <div className={`App ${isFullScreen ? "fullscreen-map" : ""}`}>
@@ -1394,138 +1414,66 @@ const toggleFullScreen = () => {
 
 
       <div className={`map-container ${isFullScreen ? "fullscreen" : ""}`}>
-
-        <div className="map-rotation-shell">
-
-          <div
-
-            className={`map-rotation-wrapper${shouldRotateMap ? " map-rotation-wrapper--active" : ""}`}
-
-            style={mapRotationStyle}
-
-          >
-
-            <Map center={mapCenter} style={{ width: "100%", height: "100%" }} level={4}>
-
-              {myLocation && (
-
-                <CustomOverlayMap position={myLocation}>
-
-                  <div className={`user-location-marker${isGuiding ? " user-location-marker--guiding" : ""}`}>
-
-                    <span
-
-                      className="user-location-marker__arrow"
-
-                      style={{
-
-                        transform: isGuiding ? `translateY(-2px) rotate(${arrowHeading}deg)` : "translateY(-2px)",
-
-                      }}
-
-                    />
-
-                    {isGuiding && <span className="user-location-marker__pulse" />}
-
-                  </div>
-
-                </CustomOverlayMap>
-
-              )}
-
-              {selectedPos && <MapMarker position={selectedPos} />}
-
-
-
-              {parkingAreas.map((area) => {
-
-                const ring = area.polygon?.coordinates?.[0]
-
-                if (!ring) return null
-
-                const path = ring.map(([lng, lat]) => ({ lng, lat }))
-
-                const color = getPolygonColor(area)
-
-                const isSelected = selectedAreaId === area._id
-
-                return (
-
-                  <Polygon
-
-                    key={area._id}
-
-                    path={path}
-
-                    strokeWeight={isSelected ? 5 : 3}
-
-                    strokeColor={isSelected ? "#3B82F6" : color}
-
-                    strokeOpacity={0.9}
-
-                    strokeStyle="solid"
-
-                    fillColor={color}
-
-                    fillOpacity={isSelected ? 0.6 : 0.45}
-
-                    onClick={() => handleAreaSelect(area)}
-
-                  />
-
-                )
-
-              })}
-
-
-
-              {routeCoords.length > 0 && (
-
-                <Polyline
-
-                  path={routeCoords.map((point) => ({ lat: point.lat, lng: point.lng }))}
-
-                  strokeWeight={6}
-
-                  strokeColor="#2563EB"
-
-                  strokeOpacity={0.8}
-
-                  strokeStyle="solid"
-
-                />
-
-              )}
-
-
-
-              {isFullScreen && isDrawMode && (
-
-                <DrawingManager
-
-                  onDrawend={handleDrawEnd}
-
-                  guideTooltip={["draw", "drag", "edit"]}
-
-                  drawingMode={["polygon"]}
-
-                  onCreate={(manager) => {
-
-                    setDrawingManager(manager)
-
+        <Map center={mapDisplayCenter} style={{ width: "100%", height: "100%" }} level={4}>
+          {myLocation && (
+            <CustomOverlayMap position={myLocation}>
+              <div className={`user-location-marker${isGuiding ? " user-location-marker--guiding" : ""}`}>
+                <span
+                  className="user-location-marker__arrow"
+                  style={{
+                    transform: isGuiding ? `translateY(-2px) rotate(${arrowHeading}deg)` : "translateY(-2px)",
                   }}
+                />
+                {isGuiding && <span className="user-location-marker__pulse" />}
+              </div>
+            </CustomOverlayMap>
+          )}
 
-                >
+          {selectedPos && <MapMarker position={selectedPos} />}
 
-                </DrawingManager>
+          {parkingAreas.map((area) => {
+            const ring = area.polygon?.coordinates?.[0]
+            if (!ring) return null
+            const path = ring.map(([lng, lat]) => ({ lng, lat }))
+            const color = getPolygonColor(area)
+            const isSelected = selectedAreaId === area._id
+            return (
+              <Polygon
+                key={area._id}
+                path={path}
+                strokeWeight={isSelected ? 5 : 3}
+                strokeColor={isSelected ? "#3B82F6" : color}
+                strokeOpacity={0.9}
+                strokeStyle="solid"
+                fillColor={color}
+                fillOpacity={isSelected ? 0.6 : 0.45}
+                onClick={() => handleAreaSelect(area)}
+              />
+            )
+          })}
 
-              )}
+          {routeCoords.length > 0 && (
+            <Polyline
+              path={routeCoords.map((point) => ({ lat: point.lat, lng: point.lng }))}
+              strokeWeight={6}
+              strokeColor="#2563EB"
+              strokeOpacity={0.8}
+              strokeStyle="solid"
+            />
+          )}
 
-            </Map>
-
-          </div>
-
-        </div>
+          {isFullScreen && isDrawMode && (
+            <DrawingManager
+              onDrawend={handleDrawEnd}
+              guideTooltip={["draw", "drag", "edit"]}
+              drawingMode={["polygon"]}
+              onCreate={(manager) => {
+                setDrawingManager(manager)
+              }}
+            >
+            </DrawingManager>
+          )}
+        </Map>
 
 
 
